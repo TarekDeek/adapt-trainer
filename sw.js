@@ -6,7 +6,11 @@ const CACHE = `adapt-${VERSION}`;
 const ASSETS = ["./", "./index.html", "./bundle.js", "./manifest.webmanifest", "./icon-180.png"];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
+  /* cache:"reload" bypasses the browser HTTP cache — without it the install
+     can precache the very build we are trying to replace. */
+  e.waitUntil(
+    caches.open(CACHE).then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: "reload" }))))
+  );
   self.skipWaiting();
 });
 
@@ -31,7 +35,8 @@ self.addEventListener("fetch", (e) => {
   e.respondWith(
     caches.open(CACHE).then(async (cache) => {
       const cached = await cache.match(req);
-      const network = fetch(req)
+      /* Same reason: revalidate against the server, not the HTTP cache. */
+      const network = fetch(new Request(req.url, { cache: "reload", credentials: "same-origin" }))
         .then((res) => {
           if (res && res.ok) cache.put(req, res.clone());
           return res;
