@@ -23,6 +23,10 @@ Done:
   (this machine had **no global git identity** — commits would have failed).
 - Added `README.md`, `AGENTS.md`, this file, `.gitignore`, `.nojekyll`.
 - Verified the bundle makes **zero network calls** — genuinely offline-capable.
+- Verified the app renders and resolves all assets from a Pages-style sub-path
+  (`/adapt-trainer/`), and that the service worker registers and caches all 5
+  assets when served from a root.
+- **Fixed the rest-timer flash** (`91116c3`) — see below.
 
 Not done — needs the owner:
 - **Create the GitHub repo and push** (no `gh` CLI on this machine, and no
@@ -48,6 +52,18 @@ Not done — needs the owner:
 On the free plan the repo must be **public** for Pages to serve. There are no
 secrets in this codebase, so public is safe here — but the training data is
 never in the repo either way, it's only in `localStorage` on the phone.
+
+## Fixed
+
+- **Rest timer flashed a wrong duration** (reported 2026-08-25, fixed
+  `91116c3`). Pressing "Rest 2:00" briefly showed an inflated time — `2:17`,
+  `3:40`, whatever — then snapped to `2:00`. Cause: the button set an absolute
+  end-timestamp, but the `now` value it's compared against only updates *while
+  a timer is running*, so the first render diffed against a stale `now` and
+  showed `120s + however long the app had been open`. The longer the app sat
+  idle, the bigger the wrong number — which is why it looked random. Fixed by
+  stamping `now` from the same timestamp in the click handler. This required
+  patching minified output; the policy that permits it is in `AGENTS.md`.
 
 ## Decisions
 

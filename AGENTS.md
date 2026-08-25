@@ -18,6 +18,30 @@ in `PROJECT.md`.
 Editing the scaffolding (`index.html`, `sw.js`, `manifest.webmanifest`, icons)
 is fine — those are hand-written and readable.
 
+### Sanctioned exception: surgical bundle patches
+
+Small, single-expression fixes to `bundle.js` are allowed when the source is
+unavailable and the bug is real, **provided every one of these holds**:
+
+1. The change is a one-liner you can state precisely in the commit message.
+2. It lands in its **own commit**, separate from any import, so `git show` is a
+   readable diff.
+3. `node --check bundle.js` passes.
+4. Behaviour is verified before *and* after in a browser, not reasoned about.
+5. It gets an entry in the table below.
+
+Anything larger than that needs the real source. Don't refactor minified code.
+
+### Patches applied to bundle.js
+
+| Date | Commit | What |
+|---|---|---|
+| 2026-08-25 | `91116c3` | Rest timer showed a wrong duration for one frame. `onClick` set `restEnd = Date.now()+12e4` but the `now` state it's diffed against only ticks while a timer runs, so the first render showed `120s + app-idle-time` (e.g. `2:17`) before snapping to `2:00`. Fix stamps `now` from the same timestamp: `()=>{let Wq7=Date.now();Be(Wq7),K(Tt>0?null:Wq7+12e4)}`. |
+
+> **A new zip drop silently reverts every patch in this table.** If the app is
+> ever replaced from a fresh `adapt-app.zip`, re-apply these or re-verify the
+> bugs were fixed upstream — otherwise old bugs quietly come back.
+
 ## Documented deviations from CONVENTIONS.md
 
 - **Conventions are written with Windows paths** (`C:\Users\tarek\...`). This
