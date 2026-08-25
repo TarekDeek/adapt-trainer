@@ -730,7 +730,13 @@ export default function AdaptTrainer() {
             {/* bottom bar */}
             <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "rgba(255,255,255,0.92)", backdropFilter: "blur(12px)", borderTop: `1px solid ${C.line}`, padding: "12px 16px", display: "flex", justifyContent: "center", zIndex: 30 }}>
               <div style={{ display: "flex", gap: 10, width: "100%", maxWidth: 528 }}>
-                <button onClick={() => setRestEnd(restLeft > 0 ? null : Date.now() + 120000)}
+                <button onClick={() => {
+                  /* Stamp `now` from the same instant: it only ticks while a timer
+                     runs, so a stale value would render one frame of 120s + idle time. */
+                  const t = Date.now();
+                  setNow(t);
+                  setRestEnd(restLeft > 0 ? null : t + 120000);
+                }}
                   style={{ fontWeight: 600, fontSize: 15, padding: "13px 16px", borderRadius: 14, border: "none", background: restLeft > 0 ? "#E8F8EC" : C.fill, color: restLeft > 0 ? C.greenDark : C.sub, minWidth: 100 }}>
                   {restLeft > 0 ? `${fmtRest(restLeft)} ✕` : "Rest 2:00"}
                 </button>
