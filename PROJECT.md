@@ -33,14 +33,23 @@ Done:
 - Verified: zero network calls; renders and resolves assets from a Pages-style
   sub-path; fully functional with the server stopped (real offline test).
 
-Not done — needs the owner:
-- **Create the GitHub repo and push** (no `gh` CLI here; no remote invented).
-- **Enable GitHub Pages.**
-- **Install on the iPhone** via Safari → Add to Home Screen.
-- **Delete the OneDrive copy of the source** at
-  `claude-code-workspaces/adaptTrainer/adapt-source/` once the push succeeds —
-  code must not live in OneDrive (CONVENTIONS §1). Left in place pending
-  confirmation; the repo copy is verified identical.
+**Shipped 2026-08-26.** Live at `https://tarekdeek.github.io/adapt-trainer/`
+— verified serving HTTP 200 with the deployed `bundle.js` byte-identical to the
+local build.
+
+- Pushed to `TarekDeek/adapt-trainer` over **SSH**. HTTPS fails: GitHub dropped
+  password auth, and the existing `~/.ssh/id_ed25519` already authenticates as
+  `TarekDeek`. Both other repos on this machine use SSH remotes too — match
+  that, don't use HTTPS.
+- OneDrive source copy **deleted** (CONVENTIONS §1). Every file was verified
+  byte-identical to something in git first; the two that weren't reproducible
+  (author's README, as-delivered package.json) are preserved verbatim in
+  `docs/original-delivery/`.
+
+Remaining for the owner:
+- **Install on the iPhone** via Safari → Add to Home Screen. Install *before*
+  logging anything: an iOS Home Screen app has separate storage from Safari,
+  so sets logged in Safari won't appear in the installed app.
 
 ## Owner setup
 
