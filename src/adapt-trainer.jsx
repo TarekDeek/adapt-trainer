@@ -11,6 +11,7 @@ const C = {
   greenDark: "#248A3D",
   blue: "#007AFF",
   fill: "#F7F7FA",
+  red: "#FF3B30",
 };
 const font = {
   fontFamily:
@@ -100,6 +101,26 @@ const schemeFor = (slot, reentry) =>
 const plannedSets = (slot, reentry) => (reentry ? 2 : MAIN_SLOTS.includes(slot) ? 4 : 3);
 const topReps = (slot) => (MAIN_SLOTS.includes(slot) ? 10 : 15);
 
+/* ============ EFFORT (reps in reserve) ============
+   Optional per set. Absent on every set logged before this existed, so every
+   reader must treat null as "not recorded" and fall back to rep-only logic. */
+const RIR_OPTS = [
+  { v: 3, label: "3+", hint: "easy" },
+  { v: 2, label: "2", hint: "solid" },
+  { v: 1, label: "1", hint: "hard" },
+  { v: 0, label: "0", hint: "to failure" },
+];
+const setEffort = (s) => (s.e === 0 || s.e ? Number(s.e) : null);
+/* Hardest set carries the signal: the closest any set got to failure. */
+const hardestEffort = (sets) => {
+  const v = sets.map(setEffort).filter((x) => x !== null);
+  return v.length ? Math.min(...v) : null;
+};
+const effortSummary = (sets) => {
+  const m = hardestEffort(sets);
+  return m === null ? "" : m === 0 ? " · to failure" : ` · ${m} left`;
+};
+
 /* Progressive overload autopilot */
 function suggestTarget(perf, slot, units) {
   if (!perf) return null;
@@ -107,12 +128,19 @@ function suggestTarget(perf, slot, units) {
   if (!sets.length) return null;
   const w = parseFloat(sets[0].w);
   const allTop = sets.every((s) => (parseInt(s.r, 10) || 0) >= topReps(slot));
+  const rir = hardestEffort(sets); // null when effort wasn't logged
   if (allTop) {
     if (isNaN(w) || !w) return "Maxed at bodyweight — add load or a harder variation";
+    /* Hit every rep but had nothing left: bank the weight before adding to it. */
+    if (rir === 0) return `Repeat ${w} ${units} — you hit the reps but went to failure. Own it first.`;
     const inc = units === "kg" ? (w >= 40 ? 2.5 : 1) : (w >= 80 ? 5 : 2.5);
-    return `Go up: ${+(w + inc).toFixed(1)} ${units} today`;
+    /* Hit every rep with 3+ still in reserve: the load, not the effort, is limiting. */
+    const easy = rir !== null && rir >= 3;
+    return `Go up: ${+(w + (easy ? inc * 2 : inc)).toFixed(1)} ${units} today${easy ? " — last time was too easy" : ""}`;
   }
   const minR = Math.min(...sets.map((s) => parseInt(s.r, 10) || 0));
+  /* Short of target but stopping early: that's an effort problem, not a load one. */
+  if (rir !== null && rir >= 3) return `Same weight — you left 3+ in the tank. Push to ${minR + 2}+ this time.`;
   return `Today: ${sets[0].w ? sets[0].w + " " + units : "same"} × ${minR + 1}+ every set`;
 }
 
@@ -648,7 +676,7 @@ export default function AdaptTrainer() {
                     <div style={{ padding: "0 18px 16px" }}>
                       {perf ? (
                         <div style={{ fontSize: 13, color: C.sub, marginBottom: 4 }}>
-                          Last ({perf.date.slice(5)}): <strong style={{ color: C.ink }}>{perf.sets.map((s) => `${s.w || "bw"}×${s.r}`).join(", ")}</strong>
+                          Last ({perf.date.slice(5)}): <strong style={{ color: C.ink }}>{perf.sets.map((s) => `${s.w || "bw"}×${s.r}`).join(", ")}</strong>{effortSummary(perf.sets)}
                         </div>
                       ) : (
                         <div style={{ fontSize: 13, color: C.sub, marginBottom: 4 }}>No history — today sets the baseline.</div>
@@ -660,13 +688,32 @@ export default function AdaptTrainer() {
                       )}
 
                       {e.sets.map((s, si) => (
-                        <div key={si} style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 8 }}>
-                          <span style={{ fontSize: 13, color: C.sub, width: 40 }}>Set {si + 1}</span>
-                          <input inputMode="decimal" placeholder={units} value={s.w} onChange={(ev) => setVal(idx, si, "w", ev.target.value)} style={inputStyle} />
-                          <span style={{ color: C.sub }}>×</span>
-                          <input inputMode="numeric" placeholder="reps" value={s.r} onChange={(ev) => setVal(idx, si, "r", ev.target.value)} style={{ ...inputStyle, width: 66 }} />
-                          <button onClick={() => delSet(idx, si)} aria-label="remove set"
-                            style={{ marginLeft: "auto", background: "transparent", border: "none", color: C.sub, fontSize: 15 }}>✕</button>
+                        <div key={si} style={{ marginTop: 8 }}>
+                          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                            <span style={{ fontSize: 13, color: C.sub, width: 40 }}>Set {si + 1}</span>
+                            <input inputMode="decimal" placeholder={units} value={s.w} onChange={(ev) => setVal(idx, si, "w", ev.target.value)} style={inputStyle} />
+                            <span style={{ color: C.sub }}>×</span>
+                            <input inputMode="numeric" placeholder="reps" value={s.r} onChange={(ev) => setVal(idx, si, "r", ev.target.value)} style={{ ...inputStyle, width: 66 }} />
+                            <button onClick={() => delSet(idx, si)} aria-label="remove set"
+                              style={{ marginLeft: "auto", background: "transparent", border: "none", color: C.sub, fontSize: 15 }}>✕</button>
+                          </div>
+                          {/* Effort — only asked once the set is actually logged, and always skippable */}
+                          {s.r ? (
+                            <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 6, paddingLeft: 40, flexWrap: "wrap" }}>
+                              <span style={{ fontSize: 12, color: C.sub, marginRight: 2 }}>reps left</span>
+                              {RIR_OPTS.map((o) => {
+                                const on = setEffort(s) === o.v;
+                                return (
+                                  <button key={o.v} onClick={() => setVal(idx, si, "e", on ? "" : o.v)}
+                                    aria-label={`${o.label} reps left — ${o.hint}`} aria-pressed={on}
+                                    style={{ padding: "5px 11px", borderRadius: 999, fontSize: 13, fontWeight: 600, border: "none",
+                                      background: on ? (o.v === 0 ? C.red : C.green) : C.fill, color: on ? "#fff" : C.sub }}>
+                                    {o.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : null}
                         </div>
                       ))}
                       <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
@@ -773,7 +820,7 @@ export default function AdaptTrainer() {
                     ? s.entries.map((e) => <div key={e.exId}><span style={{ color: C.ink, fontWeight: 500 }}>{e.name}</span> · {e.minutes} min</div>)
                     : s.entries.map((e) => (
                         <div key={e.exId}>
-                          <span style={{ color: C.ink, fontWeight: 500 }}>{e.name}</span>: {e.sets.map((x) => `${x.w || "bw"}×${x.r}`).join(", ")}
+                          <span style={{ color: C.ink, fontWeight: 500 }}>{e.name}</span>: {e.sets.map((x) => `${x.w || "bw"}×${x.r}`).join(", ")}{effortSummary(e.sets)}
                         </div>
                       ))}
                 </div>
