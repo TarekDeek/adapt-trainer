@@ -5,85 +5,97 @@ Living log. Update as work lands; this is what the next session reads.
 ## What this is
 
 A personal adaptive training PWA — picks each day's session from your last 7
-days of history, scoped to whatever equipment you have. Offline-first, no
-backend, no accounts. Hosted on GitHub Pages so it can be installed to the
-iPhone Home Screen.
+days of history, scoped to whatever equipment you have, and autoregulates load
+from how hard each set actually felt. Offline-first, no backend, no accounts.
+Hosted on GitHub Pages so it can be installed to the iPhone Home Screen.
 
 Not to be confused with **REPS** (`repos/reps`), the other fitness PWA in this
 workspace. Separate app, separate repo. Nothing was touched there.
 
 ## Status — 2026-08-25
 
-Repo created on macOS from `adapt-app.zip` (6 files, a pre-built React bundle
-plus PWA scaffolding) found in the `adaptTrainer` workspace.
+Repo created on macOS from `adapt-app.zip`; full source located mid-session and
+committed, so the app is now normally maintainable.
 
 Done:
-- Extracted to `/Users/tarekdeek/repos/adapt-trainer`, `git init`, branch `main`.
-- Git author set to `TarekDeek / 77941062+TarekDeek@users.noreply.github.com`
-  (this machine had **no global git identity** — commits would have failed).
-- Added `README.md`, `AGENTS.md`, this file, `.gitignore`, `.nojekyll`.
-- Verified the bundle makes **zero network calls** — genuinely offline-capable.
-- Verified the app renders and resolves all assets from a Pages-style sub-path
-  (`/adapt-trainer/`), and that the service worker registers and caches all 5
-  assets when served from a root.
-- **Fixed the rest-timer flash** (`91116c3`) — see below.
+- Repo at `/Users/tarekdeek/repos/adapt-trainer`, branch `main`, git author set
+  to `TarekDeek / 77941062+...noreply` (this machine had **no global git
+  identity** — commits would have failed).
+- Source committed (`src/`), `npm run build` verified to reproduce the
+  originally-shipped bundle **byte-identically**.
+- Workspace docs per conventions; `adaptTrainer` row added to the shared
+  `CONVENTIONS.md` project table (approved 2026-08-25).
+- **Fixed the rest-timer flash** (`d7aaa3e`).
+- **Added per-set effort + effort-driven progression** (`dc23696`).
+- **Fixed the service-worker update path** (`dc23696`, `2ee6cf3`) — deploys now
+  actually reach installed phones.
+- Verified: zero network calls; renders and resolves assets from a Pages-style
+  sub-path; fully functional with the server stopped (real offline test).
 
 Not done — needs the owner:
-- **Create the GitHub repo and push** (no `gh` CLI on this machine, and no
-  remote was invented). See "Owner setup" below.
-- **Enable GitHub Pages** on the repo.
+- **Create the GitHub repo and push** (no `gh` CLI here; no remote invented).
+- **Enable GitHub Pages.**
 - **Install on the iPhone** via Safari → Add to Home Screen.
+- **Delete the OneDrive copy of the source** at
+  `claude-code-workspaces/adaptTrainer/adapt-source/` once the push succeeds —
+  code must not live in OneDrive (CONVENTIONS §1). Left in place pending
+  confirmation; the repo copy is verified identical.
 
 ## Owner setup
 
 1. Create an empty repo `TarekDeek/adapt-trainer` on GitHub (no README, no
-   .gitignore — this repo already has both).
+   .gitignore — this repo has both).
 2. From `/Users/tarekdeek/repos/adapt-trainer`:
    ```
    git remote add origin https://github.com/TarekDeek/adapt-trainer.git
    git push -u origin main
    ```
-3. Repo → **Settings → Pages** → Source: **Deploy from a branch**, Branch:
-   `main`, Folder: `/ (root)`. Save.
-4. Wait ~1 min, then open `https://tarekdeek.github.io/adapt-trainer/` **in
-   Safari on the iPhone** → Share → Add to Home Screen.
+3. Settings → Pages → Source: **Deploy from a branch**, Branch `main`,
+   Folder `/ (root)`. Save.
+4. Wait ~1 min, open `https://tarekdeek.github.io/adapt-trainer/` **in Safari
+   on the iPhone** → Share → Add to Home Screen.
 
-**Public vs private:** GitHub Pages on a *private* repo requires a paid plan.
-On the free plan the repo must be **public** for Pages to serve. There are no
-secrets in this codebase, so public is safe here — but the training data is
-never in the repo either way, it's only in `localStorage` on the phone.
+**Public vs private:** Pages on a *private* repo needs a paid plan; on the free
+plan the repo must be **public**. No secrets exist in this codebase, and
+training data lives only in the phone's localStorage, so public is safe.
 
 ## Fixed
 
-- **Rest timer flashed a wrong duration** (reported 2026-08-25, fixed
-  `91116c3`). Pressing "Rest 2:00" briefly showed an inflated time — `2:17`,
-  `3:40`, whatever — then snapped to `2:00`. Cause: the button set an absolute
-  end-timestamp, but the `now` value it's compared against only updates *while
-  a timer is running*, so the first render diffed against a stale `now` and
-  showed `120s + however long the app had been open`. The longer the app sat
-  idle, the bigger the wrong number — which is why it looked random. Fixed by
-  stamping `now` from the same timestamp in the click handler. This required
-  patching minified output; the policy that permits it is in `AGENTS.md`.
+- **Rest timer flashed a wrong duration** (reported 2026-08-25, `d7aaa3e`).
+  Pressing "Rest 2:00" briefly showed an inflated time — `2:17`, `3:40` — then
+  snapped to `2:00`. The button set an absolute end-timestamp, but the `now` it
+  is compared against only ticks *while a timer runs*, so the first render
+  diffed against a stale `now` and showed `120s + time the app had been open`.
+  Looked random because it scaled with idle time. Reproduced at 17s idle
+  (`2:17`), fixed, re-verified: correct from the first frame.
+
+- **Service worker never delivered updates** (`dc23696`, `2ee6cf3`). It was
+  cache-first on a fixed key `adapt-v1`: once a phone installed the app, no
+  future deploy would ever reach it. Now a versioned cache with cleanup on
+  activate, stale-while-revalidate, and `cache: "reload"` so revalidation
+  bypasses the browser's HTTP cache — without that last part the worker
+  re-cached the build it was replacing and the update still never landed.
+  Verified against a marker build: old worker stale forever; new worker updates
+  immediately on a `VERSION` bump, and on the second launch without one.
 
 ## Decisions
 
-- **Kept the pre-built `bundle.js` as-is** rather than trying to reconstruct
-  source. It works, and hand-editing minified output would make the app
-  unmaintainable. See `AGENTS.md`.
 - **Kept all paths relative** so the app works from the Pages sub-path
-  `/adapt-trainer/` without changes.
-- **Left `sw.js` untouched** despite a known update-delivery flaw (cache-first,
-  fixed cache name, never invalidates). Flagged rather than silently changed —
-  see "Next up".
+  `/adapt-trainer/` unchanged.
+- **`bundle.js` is committed** even though it's build output — Pages deploys
+  from the branch with no build step, so the artifact has to be in git.
+- **Effort is optional, never defaulted.** A guessed effort is worse than none,
+  because it silently drives load changes. All pre-existing history has no
+  effort and keeps the old rep-only progression.
+- **Doubled increment only when both signals agree** (all target reps hit *and*
+  3+ reps left). Either signal alone keeps the normal increment.
 
 ## Next up
 
-- **Fix the service-worker update path.** As written, once the app is installed
-  on the phone, *no future deploy will ever reach it*. Bump `CACHE` per release
-  and purge old caches on `activate`. Worth doing before the first update, not
-  after. Details in `AGENTS.md` → Deploy traps.
-- **Find or reconstruct the app source.** Right now the app can never be
-  changed, only replaced wholesale by a new zip. If the source exists somewhere,
-  getting it into a repo is the highest-value follow-up.
-- Consider a custom domain if the `github.io` URL is annoying on the Home
-  Screen (the icon label already reads "Adapt" regardless).
+- Ship it: push, enable Pages, install, and train with it for a couple of weeks
+  before adding anything else.
+- Once there's real effort data, the obvious follow-on is **fatigue-aware
+  session planning** — `planToday` currently decides from session dates and
+  counts only. A week where every set is logged at 0–1 reps left is exactly the
+  signal for an easier day, and the data will finally be there to do it.
+- Possible: chart effort trend per exercise in History.
