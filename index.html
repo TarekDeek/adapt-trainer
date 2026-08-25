@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <title>Adapt Trainer</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icon-180.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Adapt" />
+  <meta name="theme-color" content="#F2F2F7" />
+  <style>
+    html, body { margin: 0; padding: 0; background: #F2F2F7; }
+    body { padding-top: env(safe-area-inset-top); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="bundle.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+  </script>
+</body>
+</html>
