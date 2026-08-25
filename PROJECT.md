@@ -26,7 +26,8 @@ Done:
 - Workspace docs per conventions; `adaptTrainer` row added to the shared
   `CONVENTIONS.md` project table (approved 2026-08-25).
 - **Fixed the rest-timer flash** (`d7aaa3e`).
-- **Added per-set effort + effort-driven progression** (`dc23696`).
+- **Added per-set effort + effort-driven progression** (`dc23696`, reworked in
+  `HEAD`: subjective effort level, not reps-in-reserve — owner's call).
 - **Fixed the service-worker update path** (`dc23696`, `2ee6cf3`) — deploys now
   actually reach installed phones.
 - Verified: zero network calls; renders and resolves assets from a Pages-style
@@ -84,11 +85,20 @@ training data lives only in the phone's localStorage, so public is safe.
   `/adapt-trainer/` unchanged.
 - **`bundle.js` is committed** even though it's build output — Pages deploys
   from the branch with no build step, so the artifact has to be in git.
+- **Effort is a subjective level, not reps-in-reserve.** First cut asked "how
+  many reps left?" (3+/2/1/0); the owner wanted "how hard did it feel?"
+  instead, so it's now `Easy / Medium / Hard / Max`. Simpler to answer honestly
+  mid-set, and it's what was actually asked for.
+- **Stored as `ef`, not `e`.** The two schemes invert each other — high RIR
+  meant *easy*, high effort means *hard*. Renaming rather than repurposing
+  means any set still carrying `e` is ignored instead of read backwards.
+  Nothing had shipped, so no migration was needed, but the rename costs
+  nothing and removes the failure mode permanently.
 - **Effort is optional, never defaulted.** A guessed effort is worse than none,
   because it silently drives load changes. All pre-existing history has no
   effort and keeps the old rep-only progression.
 - **Doubled increment only when both signals agree** (all target reps hit *and*
-  3+ reps left). Either signal alone keeps the normal increment.
+  it felt Easy). Either signal alone keeps the normal increment.
 
 ## Next up
 
@@ -96,6 +106,6 @@ training data lives only in the phone's localStorage, so public is safe.
   before adding anything else.
 - Once there's real effort data, the obvious follow-on is **fatigue-aware
   session planning** — `planToday` currently decides from session dates and
-  counts only. A week where every set is logged at 0–1 reps left is exactly the
+  counts only. A week where every set is logged Hard or Max is exactly the
   signal for an easier day, and the data will finally be there to do it.
 - Possible: chart effort trend per exercise in History.

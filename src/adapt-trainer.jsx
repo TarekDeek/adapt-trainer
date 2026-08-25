@@ -101,24 +101,30 @@ const schemeFor = (slot, reentry) =>
 const plannedSets = (slot, reentry) => (reentry ? 2 : MAIN_SLOTS.includes(slot) ? 4 : 3);
 const topReps = (slot) => (MAIN_SLOTS.includes(slot) ? 10 : 15);
 
-/* ============ EFFORT (reps in reserve) ============
-   Optional per set. Absent on every set logged before this existed, so every
-   reader must treat null as "not recorded" and fall back to rep-only logic. */
-const RIR_OPTS = [
-  { v: 3, label: "3+", hint: "easy" },
-  { v: 2, label: "2", hint: "solid" },
-  { v: 1, label: "1", hint: "hard" },
-  { v: 0, label: "0", hint: "to failure" },
+/* ============ EFFORT ============
+   How hard the set felt, 1 (easy) → 4 (max). Higher = harder.
+
+   Stored as `ef`, deliberately NOT `e`: an earlier build used `e` for reps-in-
+   reserve, where a HIGH number meant EASY. Reusing the key would silently
+   invert the meaning of any set logged under it. Optional — absent on every
+   set logged before this existed, so every reader must treat null as "not
+   recorded" and fall back to rep-only logic. */
+const EFFORT_OPTS = [
+  { v: 1, label: "Easy", hint: "could have done several more" },
+  { v: 2, label: "Medium", hint: "comfortable" },
+  { v: 3, label: "Hard", hint: "a real fight" },
+  { v: 4, label: "Max", hint: "nothing left" },
 ];
-const setEffort = (s) => (s.e === 0 || s.e ? Number(s.e) : null);
-/* Hardest set carries the signal: the closest any set got to failure. */
+const EFFORT_WORD = { 1: "easy", 2: "medium", 3: "hard", 4: "max" };
+const setEffort = (s) => (s.ef ? Number(s.ef) : null);
+/* Hardest set carries the signal. */
 const hardestEffort = (sets) => {
   const v = sets.map(setEffort).filter((x) => x !== null);
-  return v.length ? Math.min(...v) : null;
+  return v.length ? Math.max(...v) : null;
 };
 const effortSummary = (sets) => {
   const m = hardestEffort(sets);
-  return m === null ? "" : m === 0 ? " · to failure" : ` · ${m} left`;
+  return m === null ? "" : ` · felt ${EFFORT_WORD[m]}`;
 };
 
 /* Progressive overload autopilot */
@@ -128,19 +134,19 @@ function suggestTarget(perf, slot, units) {
   if (!sets.length) return null;
   const w = parseFloat(sets[0].w);
   const allTop = sets.every((s) => (parseInt(s.r, 10) || 0) >= topReps(slot));
-  const rir = hardestEffort(sets); // null when effort wasn't logged
+  const effort = hardestEffort(sets); // null when effort wasn't logged
   if (allTop) {
     if (isNaN(w) || !w) return "Maxed at bodyweight — add load or a harder variation";
-    /* Hit every rep but had nothing left: bank the weight before adding to it. */
-    if (rir === 0) return `Repeat ${w} ${units} — you hit the reps but went to failure. Own it first.`;
+    /* Hit every rep but it was all-out: bank the weight before adding to it. */
+    if (effort === 4) return `Repeat ${w} ${units} — you hit the reps but it was all-out. Own it first.`;
     const inc = units === "kg" ? (w >= 40 ? 2.5 : 1) : (w >= 80 ? 5 : 2.5);
-    /* Hit every rep with 3+ still in reserve: the load, not the effort, is limiting. */
-    const easy = rir !== null && rir >= 3;
-    return `Go up: ${+(w + (easy ? inc * 2 : inc)).toFixed(1)} ${units} today${easy ? " — last time was too easy" : ""}`;
+    /* Hit every rep and it felt easy: the load, not the effort, is limiting. */
+    const easy = effort === 1;
+    return `Go up: ${+(w + (easy ? inc * 2 : inc)).toFixed(1)} ${units} today${easy ? " — last time felt easy" : ""}`;
   }
   const minR = Math.min(...sets.map((s) => parseInt(s.r, 10) || 0));
-  /* Short of target but stopping early: that's an effort problem, not a load one. */
-  if (rir !== null && rir >= 3) return `Same weight — you left 3+ in the tank. Push to ${minR + 2}+ this time.`;
+  /* Short of target but it felt easy: that's an effort problem, not a load one. */
+  if (effort === 1) return `Same weight — last time felt easy. Push to ${minR + 2}+ this time.`;
   return `Today: ${sets[0].w ? sets[0].w + " " + units : "same"} × ${minR + 1}+ every set`;
 }
 
@@ -699,15 +705,15 @@ export default function AdaptTrainer() {
                           </div>
                           {/* Effort — only asked once the set is actually logged, and always skippable */}
                           {s.r ? (
-                            <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 6, paddingLeft: 40, flexWrap: "wrap" }}>
-                              <span style={{ fontSize: 12, color: C.sub, marginRight: 2 }}>reps left</span>
-                              {RIR_OPTS.map((o) => {
+                            <div style={{ display: "flex", gap: 5, alignItems: "center", marginTop: 6, paddingLeft: 6, flexWrap: "wrap" }}>
+                              <span style={{ fontSize: 12, color: C.sub, marginRight: 1 }}>effort</span>
+                              {EFFORT_OPTS.map((o) => {
                                 const on = setEffort(s) === o.v;
                                 return (
-                                  <button key={o.v} onClick={() => setVal(idx, si, "e", on ? "" : o.v)}
-                                    aria-label={`${o.label} reps left — ${o.hint}`} aria-pressed={on}
-                                    style={{ padding: "5px 11px", borderRadius: 999, fontSize: 13, fontWeight: 600, border: "none",
-                                      background: on ? (o.v === 0 ? C.red : C.green) : C.fill, color: on ? "#fff" : C.sub }}>
+                                  <button key={o.v} onClick={() => setVal(idx, si, "ef", on ? "" : o.v)}
+                                    aria-label={`Effort: ${o.label} — ${o.hint}`} aria-pressed={on}
+                                    style={{ padding: "5px 9px", borderRadius: 999, fontSize: 12.5, fontWeight: 600, border: "none", whiteSpace: "nowrap",
+                                      background: on ? (o.v === 4 ? C.red : C.green) : C.fill, color: on ? "#fff" : C.sub }}>
                                     {o.label}
                                   </button>
                                 );

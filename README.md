@@ -16,8 +16,8 @@ mode.
   selection changes to match.
 - **Logging** — sets, reps, load, rest timers, plus optional cardio and
   body/fuel (protein) entries that don't affect your split.
-- **Effort per set** — after logging reps, optionally tap how many reps you had
-  left (`3+ / 2 / 1 / 0`). This is what lets the app tell "hit 4×10 easily"
+- **Effort per set** — after logging reps, optionally tap how the set felt:
+  `Easy / Medium / Hard / Max`. This is what lets the app tell "hit 4×10 easily"
   apart from "barely survived 4×10", and it feeds load progression directly.
 - **History** — past sessions; the first one you log becomes the baseline
   everything else adapts around.
@@ -55,14 +55,18 @@ what to do today:
 
 | Last time | Suggestion |
 |---|---|
-| Hit every rep, 3+ left in the tank | Go up — **double** the usual jump ("too easy") |
-| Hit every rep, normal effort | Go up one increment |
-| Hit every rep, went to failure | Repeat the same weight and own it first |
-| Short of target, 3+ left | Same weight — that's an effort problem, push harder |
+| Hit every rep, felt **Easy** | Go up — **double** the usual jump ("felt easy") |
+| Hit every rep, Medium or Hard | Go up one increment |
+| Hit every rep, felt **Max** | Repeat the same weight and own it first |
+| Short of target, felt **Easy** | Same weight — that's an effort problem, push harder |
 | Short of target | Same weight, one more rep per set |
 | No effort logged | Rep-only logic, exactly as before effort existed |
 
 Effort is always optional. Sets logged without it fall back to the last row.
+
+Stored per set as `ef` (1 = Easy → 4 = Max). Deliberately **not** `e`: an earlier
+build briefly used `e` for reps-in-reserve, where a *high* number meant *easy*.
+Reusing the key would have silently inverted the meaning of that data.
 
 ## Building
 

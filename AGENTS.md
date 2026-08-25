@@ -50,11 +50,19 @@ From the original author, still true:
 
 Added since:
 
-- **Effort (`e`) is optional and must stay optional.** It's reps-in-reserve
-  (3+/2/1/0), asked only after reps are entered. `suggestTarget` falls back to
-  rep-only logic whenever it's absent, which is every set logged before the
-  feature existed. Never make it required or default it to a value — a guessed
-  effort is worse than no effort, because it silently drives load changes.
+- **Effort (`ef`) is optional and must stay optional.** It's how the set felt,
+  `1` Easy → `4` Max (higher = harder), asked only after reps are entered.
+  `suggestTarget` falls back to rep-only logic whenever it's absent, which is
+  every set logged before the feature existed. Never make it required or
+  default it to a value — a guessed effort is worse than no effort, because it
+  silently drives load changes.
+
+- **The key is `ef`, and `e` is burned.** A first cut of this feature stored
+  reps-in-reserve in `e`, where a *high* value meant *easy* — the exact
+  opposite of `ef`. The field was renamed rather than repurposed so that any
+  set still carrying `e` is simply ignored instead of being read upside-down
+  (verified: stale `e:3` yields the normal increment, not the doubled one).
+  **Never revive `e` for anything.**
 
 ## Deploy traps
 
