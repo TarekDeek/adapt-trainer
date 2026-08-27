@@ -96,9 +96,11 @@ const SLOT_LABEL = {
   biceps: "Biceps", triceps: "Triceps", core: "Core",
 };
 const MAIN_SLOTS = ["hpush", "vpush", "vpull", "hpull", "squat", "singleleg", "hinge"];
-const schemeFor = (slot, reentry) =>
-  reentry ? "2 × 8–12, easy" : MAIN_SLOTS.includes(slot) ? "4 × 6–10" : "3 × 10–15";
-const plannedSets = (slot, reentry) => (reentry ? 2 : MAIN_SLOTS.includes(slot) ? 4 : 3);
+const schemeFor = (slot, reentry, light) =>
+  reentry ? "2 × 8–12, easy"
+  : light ? (MAIN_SLOTS.includes(slot) ? "2 × 6–10, leave 2 in the tank" : "2 × 10–15, leave 2 in the tank")
+  : MAIN_SLOTS.includes(slot) ? "4 × 6–10" : "3 × 10–15";
+const plannedSets = (slot, reentry, light) => (reentry || light ? 2 : MAIN_SLOTS.includes(slot) ? 4 : 3);
 const topReps = (slot) => (MAIN_SLOTS.includes(slot) ? 10 : 15);
 
 /* ============ EFFORT ============
@@ -126,12 +128,18 @@ const effortSummary = (sets) => {
   const m = hardestEffort(sets);
   return m === null ? "" : ` · felt ${EFFORT_WORD[m]}`;
 };
+const EFFORT_LETTER = { 1: "E", 2: "M", 3: "H", 4: "X" };
+/* In-row chip: tap cycles unset → 1 → 2 → 3 → 4 → unset. Intermediate states
+   are harmless — autosave is debounced and planning reads finished sessions. */
+const cycleEffort = (cur) => (cur === 4 ? "" : (cur || 0) + 1);
 
 /* Progressive overload autopilot */
-function suggestTarget(perf, slot, units) {
+function suggestTarget(perf, slot, units, light) {
   if (!perf) return null;
   const sets = perf.sets.filter((s) => s.r);
   if (!sets.length) return null;
+  /* On a deliberate light day the target is capped, not progressed. */
+  if (light) return "Light day: same weight as last time, stop 2–3 reps short.";
   const w = parseFloat(sets[0].w);
   const allTop = sets.every((s) => (parseInt(s.r, 10) || 0) >= topReps(slot));
   const effort = hardestEffort(sets); // null when effort wasn't logged
@@ -147,6 +155,9 @@ function suggestTarget(perf, slot, units) {
   const minR = Math.min(...sets.map((s) => parseInt(s.r, 10) || 0));
   /* Short of target but it felt easy: that's an effort problem, not a load one. */
   if (effort === 1) return `Same weight — last time felt easy. Push to ${minR + 2}+ this time.`;
+  /* All-out and still short: hold the load — demanding more programs failure-chasing. */
+  if (effort === 4)
+    return `Repeat ${sets[0].w ? sets[0].w + " " + units : "same weight"} × ${minR}+ — last time was all-out. Recover it before you push it.`;
   return `Today: ${sets[0].w ? sets[0].w + " " + units : "same"} × ${minR + 1}+ every set`;
 }
 
@@ -187,7 +198,40 @@ const prettyDate = () =>
   new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
 
 /* ============ THE ADAPTIVE BRAIN ============ */
-function planToday(sessions) {
+
+/* ---- Fatigue (strain hygiene, not overtraining detection) ----
+   One signal: the share of effort-rated sets at Hard/Max over the trailing
+   week. One intervention: a light day — same session type, half the sets.
+   Silent unless enough effort has actually been logged, so a user who never
+   taps the effort chip gets exactly the pre-fatigue behavior.
+   NOTE: counting Hard (3) alongside Max (4) is defensible only because of the
+   EFFORT_OPTS anchors ("a real fight" / "nothing left"). Softening those
+   anchors silently changes what FATIGUE_HARD_SHARE means. */
+const FATIGUE_WINDOW_DAYS = 7;        // same trailing window basePlan already uses
+const FATIGUE_MIN_RATED_SETS = 6;     // fewer rated sets → not enough evidence, stay silent
+const FATIGUE_MIN_RATED_SESSIONS = 2; // one brutal day is a day, not a trend
+const FATIGUE_HARD_SHARE = 2 / 3;     // two of every three rated sets Hard/Max → strain
+const LIGHT_COOLDOWN_DAYS = 7;        // at most one automatic light day per rolling week
+
+/* Evidence counts { hard, rated }, or null to stay silent. `past` must already
+   be cardio-free (house rule: cardio never influences lifting programming). */
+function fatigueCheck(past, today) {
+  if (past.some((s) => s.light && diffDays(s.date, today) <= LIGHT_COOLDOWN_DAYS)) return null;
+  const rated = [];
+  for (const s of past) {
+    if (diffDays(s.date, today) > FATIGUE_WINDOW_DAYS) continue;
+    for (const e of s.entries || [])
+      for (const st of e.sets || [])
+        if (st.r && setEffort(st) !== null) rated.push({ ef: setEffort(st), sid: s.id });
+  }
+  if (rated.length < FATIGUE_MIN_RATED_SETS) return null;
+  if (new Set(rated.map((x) => x.sid)).size < FATIGUE_MIN_RATED_SESSIONS) return null;
+  const hard = rated.filter((x) => x.ef >= 3).length;
+  if (hard / rated.length < FATIGUE_HARD_SHARE) return null;
+  return { hard, rated: rated.length };
+}
+
+function basePlan(sessions) {
   const today = todayStr();
   /* cardio never influences lifting programming */
   const past = sessions.filter((s) => s.date < today && s.type !== "CARDIO").sort((a, b) => a.date.localeCompare(b.date));
@@ -229,6 +273,29 @@ function planToday(sessions) {
   let reason = `${freq} session this week — full body keeps everything covered.`;
   if (gap === 1) reason += " Back-to-back days: different exercises today, go easy on anything sore.";
   return { type: next, reason };
+}
+
+/* basePlan picks the session; fatigue may only make it lighter, never re-type
+   it — rotation and same-exercise comparisons stay intact. A throw in the
+   fatigue path would white-screen the app (no error boundary), so it fails
+   closed to the base plan. */
+function planToday(sessions) {
+  const base = basePlan(sessions);
+  try {
+    if (base.reentry || base.type === "CARDIO_DAY") return base; // already easy
+    const today = todayStr();
+    const past = sessions.filter((s) => s.date < today && s.type !== "CARDIO");
+    const fat = fatigueCheck(past, today);
+    if (!fat) return base;
+    return {
+      ...base,
+      light: true,
+      reason: `${fat.hard} of your last ${fat.rated} logged sets felt Hard or Max — today is a deliberately lighter ${TEMPLATES[base.type].label}: half the sets, stop 2–3 reps short of a fight. One easy day now beats a forced week off later.`,
+    };
+  } catch (err) {
+    console.error("fatigue check failed — using base plan", err);
+    return base;
+  }
 }
 
 /* ============ SMALL PIECES ============ */
@@ -329,6 +396,7 @@ export default function AdaptTrainer() {
   const plan = useMemo(() => planToday(sessions), [sessions]);
   const activeType = overrideType || plan.type;
   const reentry = !overrideType && plan.reentry;
+  const light = !overrideType && !!plan.light;
   const activeEq = Object.keys(equipment).filter((k) => equipment[k]);
   const avail = (v) => v.eq.every((t) => activeEq.includes(t));
 
@@ -344,12 +412,15 @@ export default function AdaptTrainer() {
     setEntries(
       tpl.slots.map((slot) => {
         const v = VARIANTS[slot].find(avail) || VARIANTS[slot].find((x) => x.eq.length === 0);
-        return v ? { slot, exId: v.id, name: v.name, scheme: schemeFor(slot, reentry), planned: plannedSets(slot, reentry), sets: [] } : null;
+        return v ? { slot, exId: v.id, name: v.name, scheme: schemeFor(slot, reentry, light), planned: plannedSets(slot, reentry, light), sets: [] } : null;
       }).filter(Boolean)
     );
     setExpanded(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, activeType, JSON.stringify(equipment), sessions.length]);
+    /* Lifting-session count, NOT sessions.length: logging cardio mid-workout
+       must never rebuild the template — it would wipe the in-progress sets,
+       and cardio can never change the plan anyway. */
+  }, [loaded, activeType, JSON.stringify(equipment), sessions.filter((s) => s.type !== "CARDIO").length]);
 
   /* autosave in-progress sets so a mid-workout reload loses nothing */
   useEffect(() => {
@@ -363,11 +434,17 @@ export default function AdaptTrainer() {
   }, [entries, loaded, activeType]);
 
   const lastPerf = (exId) => {
+    /* Prefer the last non-light session: a deliberate light day would read as
+       a regression and drag the next target down. Light-only history still
+       counts if it's all an exercise has. */
+    let lightHit = null;
     for (let i = sessions.length - 1; i >= 0; i--) {
       const e = (sessions[i].entries || []).find((x) => x.exId === exId && x.sets.length);
-      if (e) return { date: sessions[i].date, sets: e.sets };
+      if (!e) continue;
+      if (!sessions[i].light) return { date: sessions[i].date, sets: e.sets };
+      if (!lightHit) lightHit = { date: sessions[i].date, sets: e.sets };
     }
-    return null;
+    return lightHit;
   };
 
   const swapVariant = (idx) =>
@@ -424,7 +501,7 @@ export default function AdaptTrainer() {
   const finish = async () => {
     const clean = entries.map((e) => ({ slot: e.slot, exId: e.exId, name: e.name, sets: e.sets.filter((s) => s.r) })).filter((e) => e.sets.length);
     if (!clean.length) return;
-    const rec = { id: Date.now(), date: todayStr(), type: activeType, entries: clean };
+    const rec = { id: Date.now(), date: todayStr(), type: activeType, ...(light ? { light: true } : {}), entries: clean };
     const next = [...sessions, rec].sort((a, b) => a.date.localeCompare(b.date));
     setSessions(next);
     setOverrideType(null);
@@ -660,7 +737,7 @@ export default function AdaptTrainer() {
             )}
             {entries.map((e, idx) => {
               const perf = lastPerf(e.exId);
-              const target = suggestTarget(perf, e.slot, units);
+              const target = suggestTarget(perf, e.slot, units, light);
               const open = expanded === idx;
               const doneSets = e.sets.filter((s) => s.r).length;
               const swappable = VARIANTS[e.slot].filter(avail).length > 1;
@@ -694,32 +771,26 @@ export default function AdaptTrainer() {
                       )}
 
                       {e.sets.map((s, si) => (
-                        <div key={si} style={{ marginTop: 8 }}>
-                          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                            <span style={{ fontSize: 13, color: C.sub, width: 40 }}>Set {si + 1}</span>
-                            <input inputMode="decimal" placeholder={units} value={s.w} onChange={(ev) => setVal(idx, si, "w", ev.target.value)} style={inputStyle} />
-                            <span style={{ color: C.sub }}>×</span>
-                            <input inputMode="numeric" placeholder="reps" value={s.r} onChange={(ev) => setVal(idx, si, "r", ev.target.value)} style={{ ...inputStyle, width: 66 }} />
-                            <button onClick={() => delSet(idx, si)} aria-label="remove set"
-                              style={{ marginLeft: "auto", background: "transparent", border: "none", color: C.sub, fontSize: 15 }}>✕</button>
-                          </div>
-                          {/* Effort — only asked once the set is actually logged, and always skippable */}
+                        <div key={si} style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 11.5, color: C.sub, width: 34, flexShrink: 0 }}>Set {si + 1}</span>
+                          <input inputMode="decimal" placeholder={units} value={s.w} onChange={(ev) => setVal(idx, si, "w", ev.target.value)}
+                            style={{ ...inputStyle, boxSizing: "border-box", width: 70, minWidth: 58, flexShrink: 1, padding: "9px 6px" }} />
+                          <span style={{ color: C.sub }}>×</span>
+                          <input inputMode="numeric" placeholder="reps" value={s.r} onChange={(ev) => setVal(idx, si, "r", ev.target.value)}
+                            style={{ ...inputStyle, boxSizing: "border-box", width: 52, minWidth: 48, flexShrink: 1, padding: "9px 6px" }} />
+                          {/* Effort chip — tap cycles E→M→H→X→off; only asked once the set is logged */}
                           {s.r ? (
-                            <div style={{ display: "flex", gap: 5, alignItems: "center", marginTop: 6, paddingLeft: 6, flexWrap: "wrap" }}>
-                              <span style={{ fontSize: 12, color: C.sub, marginRight: 1 }}>effort</span>
-                              {EFFORT_OPTS.map((o) => {
-                                const on = setEffort(s) === o.v;
-                                return (
-                                  <button key={o.v} onClick={() => setVal(idx, si, "ef", on ? "" : o.v)}
-                                    aria-label={`Effort: ${o.label} — ${o.hint}`} aria-pressed={on}
-                                    style={{ padding: "5px 9px", borderRadius: 999, fontSize: 12.5, fontWeight: 600, border: "none", whiteSpace: "nowrap",
-                                      background: on ? (o.v === 4 ? C.red : C.green) : C.fill, color: on ? "#fff" : C.sub }}>
-                                    {o.label}
-                                  </button>
-                                );
-                              })}
-                            </div>
+                            <button onClick={() => setVal(idx, si, "ef", cycleEffort(setEffort(s)))}
+                              aria-label={`Effort: ${setEffort(s) ? EFFORT_OPTS[setEffort(s) - 1].label : "not recorded"}. Tap to change.`}
+                              style={{ width: 46, flexShrink: 0, padding: "10px 0", borderRadius: 999, border: "none", fontWeight: 700, minHeight: 34,
+                                textAlign: "center", fontSize: setEffort(s) ? 14 : 10.5,
+                                background: setEffort(s) ? (setEffort(s) === 4 ? C.red : C.green) : C.fill,
+                                color: setEffort(s) ? "#fff" : C.sub }}>
+                              {setEffort(s) ? EFFORT_LETTER[setEffort(s)] : "effort"}
+                            </button>
                           ) : null}
+                          <button onClick={() => delSet(idx, si)} aria-label="remove set"
+                            style={{ marginLeft: "auto", background: "transparent", border: "none", color: C.sub, fontSize: 15, flexShrink: 0 }}>✕</button>
                         </div>
                       ))}
                       <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
@@ -817,6 +888,7 @@ export default function AdaptTrainer() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                   <div style={{ fontSize: 16, fontWeight: 600 }}>
                     {s.type === "CARDIO" ? "Cardio" : TEMPLATES[s.type] ? TEMPLATES[s.type].label : s.type}
+                    {s.light ? <span style={{ color: C.sub, fontWeight: 400, fontSize: 12, marginLeft: 6 }}>light</span> : null}
                     <span style={{ color: C.sub, fontWeight: 400, fontSize: 13, marginLeft: 8 }}>{s.date}</span>
                   </div>
                   <button onClick={() => deleteSession(s.id)} style={{ background: "transparent", border: "none", color: C.sub, fontSize: 12 }}>Delete</button>

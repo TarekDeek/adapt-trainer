@@ -57,6 +57,21 @@ Added since:
   default it to a value — a guessed effort is worse than no effort, because it
   silently drives load changes.
 
+- **Light days (`light: true`) are fatigue's only lever.** When ≥2/3 of the
+  effort-rated sets across the trailing 7 days (min 6 rated sets over ≥2
+  sessions) were Hard or Max, `planToday` keeps the scheduled session type but
+  flags it `light`: 2 sets per lift, capped targets, evidence-bearing reason
+  string. Fatigue must **never change the session type** — rotation and
+  same-exercise comparisons depend on it. Precedence: manual override >
+  REENTRY > CARDIO_DAY > fatigue; a `light: true` session in the last 7 days
+  silences the check (one auto light day per rolling week). The persisted
+  `light` flag on session records is optional-additive; `lastPerf` prefers
+  non-light sessions so a deload never drags the next target down. The whole
+  layer is wrapped in try/catch and fails closed to the base plan.
+  NOTE: the 2/3 threshold's meaning is anchored to the `EFFORT_OPTS` hint
+  wording ("a real fight" / "nothing left") — softening those anchors silently
+  changes what the trigger measures.
+
 - **The key is `ef`, and `e` is burned.** A first cut of this feature stored
   reps-in-reserve in `e`, where a *high* value meant *easy* — the exact
   opposite of `ef`. The field was renamed rather than repurposed so that any

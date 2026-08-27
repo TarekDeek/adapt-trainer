@@ -12,6 +12,27 @@ Hosted on GitHub Pages so it can be installed to the iPhone Home Screen.
 Not to be confused with **REPS** (`repos/reps`), the other fitness PWA in this
 workspace. Separate app, separate repo. Nothing was touched there.
 
+## Status — 2026-08-27
+
+**Shipped: the fatigue-aware training brain** (planned as the flagship from the
+owner's "how can we improve this app?" session):
+
+- `fatigueCheck` + light days: ≥2/3 of effort-rated sets Hard/Max over 7 days
+  (min 6 sets, ≥2 sessions) → same session type, 2 sets per lift, capped
+  targets, evidence in the reason string. One auto light day per rolling week;
+  override wins; REENTRY and CARDIO_DAY take precedence; silent without effort
+  data (verified character-identical to the old build on effort-free history).
+- `suggestTarget`: light-day cap + new all-out-shortfall branch (ef 4 + missed
+  reps → hold the load, don't demand more).
+- `lastPerf` prefers non-light sessions so a deload never drags targets down.
+- **Effort UI**: the four pills became one in-row cycling chip (E/M/H/X, X in
+  red) beside weight × reps — owner-requested, style confirmed by them.
+- **Data-loss guard**: cardio logs no longer rebuild the working template
+  (dep array counts lifting sessions only) — logging cardio mid-workout used
+  to wipe in-progress sets.
+- Verified: 12 console-seeded acceptance cases + UI pass at 375/320. All
+  branch details in `AGENTS.md` → light days.
+
 ## Status — 2026-08-25
 
 Repo created on macOS from `adapt-app.zip`; full source located mid-session and

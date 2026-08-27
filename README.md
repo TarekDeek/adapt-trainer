@@ -16,9 +16,16 @@ mode.
   selection changes to match.
 - **Logging** — sets, reps, load, rest timers, plus optional cardio and
   body/fuel (protein) entries that don't affect your split.
-- **Effort per set** — after logging reps, optionally tap how the set felt:
-  `Easy / Medium / Hard / Max`. This is what lets the app tell "hit 4×10 easily"
-  apart from "barely survived 4×10", and it feeds load progression directly.
+- **Effort per set** — after logging reps, a chip appears beside the set: tap
+  it to cycle `E / M / H / X` (Easy → Max, fifth tap clears). This is what lets
+  the app tell "hit 4×10 easily" apart from "barely survived 4×10", and it
+  feeds both load progression and session planning.
+- **Automatic light days** — when two-thirds or more of your effort-rated sets
+  over the last 7 days (at least 6 sets across 2+ sessions) felt Hard or Max,
+  the app keeps the scheduled session but halves the sets and caps the targets,
+  telling you exactly why ("9 of your last 12 logged sets felt Hard or Max…").
+  At most one automatic light day per rolling week; a manual override always
+  wins; with no effort logged the feature is silent.
 - **History** — past sessions; the first one you log becomes the baseline
   everything else adapts around.
 - **Backup / restore** — export your data as text you paste somewhere safe, and
@@ -60,6 +67,7 @@ what to do today:
 | Hit every rep, felt **Max** | Repeat the same weight and own it first |
 | Short of target, felt **Easy** | Same weight — that's an effort problem, push harder |
 | Short of target | Same weight, one more rep per set |
+| Short of target, felt **Max** | Repeat the weight — recover it before you push it |
 | No effort logged | Rep-only logic, exactly as before effort existed |
 
 Effort is always optional. Sets logged without it fall back to the last row.
