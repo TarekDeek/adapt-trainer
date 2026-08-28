@@ -40,10 +40,13 @@ Everything lives in `localStorage` on the device, under these keys:
 | `adapt:v1` | main app state — history, settings, gym scope |
 | `adapt:draft` | in-progress session, so a reload mid-workout doesn't lose it |
 | `adapt:ping` | storage-availability probe |
+| `adapt:hideInstallHint` | set once the "Add to Home Screen" banner is dismissed |
 
 The bundle contains **zero `fetch` calls**. Nothing leaves the phone, which also
 means there is no server-side copy — **the Backup export is your only backup.**
 Deleting the PWA from the Home Screen can clear its storage with it.
+(The Edit → Share button opens the phone's share sheet with the app's URL —
+an OS affordance, not a network call; the zero-fetch guarantee stands.)
 
 ## Install on iPhone
 
@@ -54,6 +57,28 @@ Deleting the PWA from the Home Screen can clear its storage with it.
    caches the bundle.
 
 After that it opens full-screen with no browser chrome and works offline.
+
+## Sharing it with friends
+
+Send the **app** link, not the repository link:
+
+```
+https://tarekdeek.github.io/adapt-trainer/
+```
+
+The GitHub repository page shows source code; the Pages URL above *is* the
+app. The in-app **Edit → Share** button opens the phone's share sheet with
+exactly that link.
+
+Everyone who opens it gets their own independent copy: data lives in that
+phone's `localStorage`, so nobody sees anyone else's log and no account or
+server is involved. iPhone friends should install from Safari (Share → Add
+to Home Screen) **before** logging anything — the browser and the installed
+app keep separate storage. On Android: Chrome → ⋮ → Add to Home screen.
+
+Two owner-side notes: the repo must stay **public** for Pages on the free
+plan, and everyone loads the same deployed files — push to `main` and every
+installed copy picks up the update within a launch or two.
 
 ## How progression works
 

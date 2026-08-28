@@ -12,6 +12,45 @@ Hosted on GitHub Pages so it can be installed to the iPhone Home Screen.
 Not to be confused with **REPS** (`repos/reps`), the other fitness PWA in this
 workspace. Separate app, separate repo. Nothing was touched there.
 
+## Status — 2026-08-28
+
+**Sharing polish**, from the owner's "I want to share this app with my
+friends — can I just share the GitHub page link?" session. The answer is the
+Pages URL (`https://tarekdeek.github.io/adapt-trainer/`, not the repo page),
+and the app now carries that story itself:
+
+- **Install-hint banner** when running in a browser tab (never standalone);
+  dismiss persists in new optional key `adapt:hideInstallHint`. iOS wording
+  says install *before* logging — Safari and the installed PWA keep separate
+  storage, the trap README documented but nothing surfaced in-app.
+- **First-run welcome card**: renders only while `sessions` is empty, so it
+  retires itself at the first Finish. Says what the app does, where Edit is,
+  what the effort chip does, and that nothing is uploaded.
+- **Edit → Share**: `navigator.share` sheet with the app URL, clipboard
+  fallback. OS affordances, not network — the zero-fetch guarantee stands.
+- **Rest timer done-cue**: at 0:00 the button flashes a green "Go ✓" for 6 s
+  instead of silently snapping back to "Rest 2:00"; tapping it starts the
+  next rest.
+- Polish: bottom bar + main padding respect `env(safe-area-inset-bottom)`
+  (Finish sat against the iPhone home indicator), effort chip min-height
+  34 → 40, bigger tap areas on set-✕ and History Delete, favicon declared
+  (browser tabs showed a blank globe and Pages logged a 404).
+- `sw.js` VERSION v3 → v4.
+- Verified: toolchain check first (clean build byte-identical to the
+  committed bundle), then 26 Playwright checks against a Pages-style
+  sub-path serve — first-run cards, dismiss persistence across reload,
+  effort-chip cycle, share clipboard fallback, done-cue via fake clock,
+  standalone hides the banner, seeded-history user sees none of it and
+  still plans FULL_A → FULL_B. Zero console errors.
+
+Also asked: "should we add more workouts?" Recommendation delivered: no new
+session *templates* (planToday's 1–6 day/wk ladder is complete; more types
+would fragment same-exercise history), but yes to more equipment-gated
+*variants* — above all a **barbell** toggle (bench, OHP, row, back squat,
+RDL) so friends with barbell gyms get real defaults instead of goblet
+squats. Additive-safe (new equipment key defaults off; new exIds just have
+no history). Not implemented — waiting on the owner's pick of lifts.
+
 ## Status — 2026-08-27
 
 **Shipped: the fatigue-aware training brain** (planned as the flagship from the
