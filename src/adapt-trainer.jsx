@@ -188,6 +188,19 @@ const WARMUPS = {
 const warmupFor = (type) =>
   WARMUPS[{ FULL_A: "FULL", FULL_B: "FULL", REENTRY: "FULL", UPPER: "UPPER", LOWER: "LOWER", PUSH: "PUSH", PULL: "PULL", LEGS: "LOWER", CARDIO_DAY: "CARDIO_DAY" }[type]] || WARMUPS.FULL;
 
+/* ============ SHARING / INSTALL ============
+   The URL is the whole distribution story: no accounts, so every phone that
+   opens it gets its own private copy with its own data. Share/clipboard are
+   OS affordances, not network calls — the zero-fetch guarantee holds. */
+const appUrl = () => location.origin + location.pathname;
+const isStandalone = () =>
+  (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) ||
+  window.navigator.standalone === true;
+/* iPadOS 13+ reports as Mac; the touch-point check catches it */
+const isIOS = () =>
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
 /* ============ DATE HELPERS ============ */
 const todayStr = () => {
   const d = new Date();
@@ -338,6 +351,9 @@ export default function AdaptTrainer() {
   const [backupText, setBackupText] = useState("");
   const [importText, setImportText] = useState("");
   const [importMsg, setImportMsg] = useState("");
+  const [installHint, setInstallHint] = useState(false);
+  const [shareMsg, setShareMsg] = useState("");
+  const [restDone, setRestDone] = useState(false);
 
   /* rest timer */
   useEffect(() => {
@@ -346,7 +362,14 @@ export default function AdaptTrainer() {
     return () => clearInterval(t);
   }, [restEnd]);
   const restLeft = restEnd ? Math.max(0, Math.ceil((restEnd - now) / 1000)) : 0;
-  useEffect(() => { if (restEnd && restLeft === 0) setRestEnd(null); }, [restLeft, restEnd]);
+  /* At 0:00 the button used to snap straight back to "Rest 2:00" — a glance
+     couldn't tell "done" from "never started". Flash a done state instead. */
+  useEffect(() => { if (restEnd && restLeft === 0) { setRestEnd(null); setRestDone(true); } }, [restLeft, restEnd]);
+  useEffect(() => {
+    if (!restDone) return;
+    const t = setTimeout(() => setRestDone(false), 6000);
+    return () => clearTimeout(t);
+  }, [restDone]);
   const fmtRest = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
   /* persistence */
@@ -382,6 +405,13 @@ export default function AdaptTrainer() {
         const back = await window.storage.get("adapt:ping");
         setStorageOk(!!(back && back.value === stamp));
       } catch (e) { setStorageOk(false); }
+      /* running in a browser tab (not installed): nudge toward Home Screen,
+         unless dismissed before — get() throws when the key is absent */
+      try {
+        await window.storage.get("adapt:hideInstallHint");
+      } catch (e) {
+        if (!isStandalone()) setInstallHint(true);
+      }
       setLoaded(true);
     })();
   }, []);
@@ -541,6 +571,30 @@ export default function AdaptTrainer() {
   const eqSummary = [["machines", "Machines"], ["cables", "Cables"], ["dumbbells", "DBs"], ["bench", "Bench"], ["dip", "Dips"], ["pullup", "Bar"]]
     .filter(([k]) => equipment[k]).map(([, l]) => l).join(" · ") || "Bodyweight only";
 
+  const dismissInstallHint = () => {
+    setInstallHint(false);
+    window.storage.set("adapt:hideInstallHint", "1").catch(() => {});
+  };
+  const shareApp = async () => {
+    const url = appUrl();
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Adapt Trainer", text: "A workout app that plans each session for you — free, no account, works offline.", url });
+        return;
+      }
+      throw new Error("no web share");
+    } catch (e) {
+      if (e && e.name === "AbortError") return; // user closed the share sheet
+      try {
+        await navigator.clipboard.writeText(url);
+        setShareMsg("Link copied ✓");
+      } catch (e2) {
+        setShareMsg("Copy the address-bar link instead");
+      }
+      setTimeout(() => setShareMsg(""), 2500);
+    }
+  };
+
   const exportData = () =>
     setBackupText(JSON.stringify({ sessions, equipment, units, bw }));
   const importData = async () => {
@@ -570,7 +624,7 @@ export default function AdaptTrainer() {
         @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
       `}</style>
 
-      <main style={{ maxWidth: 560, margin: "0 auto", padding: "20px 16px 110px" }}>
+      <main style={{ maxWidth: 560, margin: "0 auto", padding: "20px 16px calc(110px + env(safe-area-inset-bottom))" }}>
 
         {/* header */}
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
@@ -601,6 +655,39 @@ export default function AdaptTrainer() {
 
         {view === "today" && entries && (
           <>
+            {/* install nudge — browser-tab visitors only. On iOS the browser and
+                the installed app keep SEPARATE storage, so installing before
+                logging is the difference between keeping and losing history. */}
+            {installHint && (
+              <section style={{ background: C.card, borderRadius: 16, boxShadow: shadow, padding: "12px 14px 12px 18px", marginBottom: 12, display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>Put it on your Home Screen</div>
+                  <p style={{ fontSize: 13, color: C.sub, lineHeight: 1.5, margin: "3px 0 0" }}>
+                    {isIOS() ? (
+                      <>In <strong style={{ color: C.ink }}>Safari</strong>: Share → <strong style={{ color: C.ink }}>Add to Home Screen</strong> (other iPhone browsers can't). It opens full-screen, works offline — and install <em>before</em> logging: the browser and the installed app keep separate data.</>
+                    ) : (
+                      <>In Chrome: menu ⋮ → <strong style={{ color: C.ink }}>Add to Home screen</strong> / Install. It opens full-screen and works offline.</>
+                    )}
+                  </p>
+                </div>
+                <button onClick={dismissInstallHint} aria-label="dismiss install hint"
+                  style={{ background: "transparent", border: "none", color: C.sub, fontSize: 15, padding: "4px 6px", flexShrink: 0 }}>✕</button>
+              </section>
+            )}
+
+            {/* first-run welcome — disappears once the first session is saved */}
+            {!sessions.length && (
+              <section style={{ background: C.card, borderRadius: 16, boxShadow: shadow, padding: "14px 18px", marginBottom: 12 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Welcome 👋</div>
+                <p style={{ fontSize: 13.5, color: C.sub, lineHeight: 1.55, margin: 0 }}>
+                  Adapt Trainer plans each workout from what you actually did over the last 7 days — no program to pick.
+                  Tap <strong style={{ color: C.ink }}>Edit</strong> below to set what equipment you have, log your sets,
+                  and after each set tap the <strong style={{ color: C.ink }}>effort</strong> chip (Easy → Max) so the
+                  weights adjust themselves. Everything stays on this device — nothing is uploaded, ever.
+                </p>
+              </section>
+            )}
+
             {/* session card */}
             <section style={{ background: C.card, borderRadius: 16, boxShadow: shadow, padding: "16px 18px", marginBottom: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -695,6 +782,12 @@ export default function AdaptTrainer() {
                     </button>
                   )}
                   {importMsg && <div style={{ fontSize: 12, color: importMsg.includes("✓") ? C.greenDark : "#C0362C", marginTop: 6 }}>{importMsg}</div>}
+                  <div style={{ fontSize: 12, color: C.sub, fontWeight: 600, margin: "16px 0 8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Share</div>
+                  <button onClick={shareApp}
+                    style={{ width: "100%", padding: "9px 0", borderRadius: 10, border: "none", background: C.fill, color: C.blue, fontWeight: 600, fontSize: 14 }}>
+                    {shareMsg || "Share this app with a friend"}
+                  </button>
+                  <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>Sends them the link. They get their own copy — your log stays on your phone.</div>
                 </div>
               )}
             </section>
@@ -782,7 +875,7 @@ export default function AdaptTrainer() {
                           {s.r ? (
                             <button onClick={() => setVal(idx, si, "ef", cycleEffort(setEffort(s)))}
                               aria-label={`Effort: ${setEffort(s) ? EFFORT_OPTS[setEffort(s) - 1].label : "not recorded"}. Tap to change.`}
-                              style={{ width: 46, flexShrink: 0, padding: "10px 0", borderRadius: 999, border: "none", fontWeight: 700, minHeight: 34,
+                              style={{ width: 46, flexShrink: 0, padding: "10px 0", borderRadius: 999, border: "none", fontWeight: 700, minHeight: 40,
                                 textAlign: "center", fontSize: setEffort(s) ? 14 : 10.5,
                                 background: setEffort(s) ? (setEffort(s) === 4 ? C.red : C.green) : C.fill,
                                 color: setEffort(s) ? "#fff" : C.sub }}>
@@ -790,7 +883,7 @@ export default function AdaptTrainer() {
                             </button>
                           ) : null}
                           <button onClick={() => delSet(idx, si)} aria-label="remove set"
-                            style={{ marginLeft: "auto", background: "transparent", border: "none", color: C.sub, fontSize: 15, flexShrink: 0 }}>✕</button>
+                            style={{ marginLeft: "auto", background: "transparent", border: "none", color: C.sub, fontSize: 15, flexShrink: 0, padding: "8px 10px", marginRight: -10 }}>✕</button>
                         </div>
                       ))}
                       <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
@@ -852,17 +945,19 @@ export default function AdaptTrainer() {
             </section>
 
             {/* bottom bar */}
-            <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "rgba(255,255,255,0.92)", backdropFilter: "blur(12px)", borderTop: `1px solid ${C.line}`, padding: "12px 16px", display: "flex", justifyContent: "center", zIndex: 30 }}>
+            {/* safe-area padding keeps Finish clear of the iPhone home indicator */}
+            <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "rgba(255,255,255,0.92)", backdropFilter: "blur(12px)", borderTop: `1px solid ${C.line}`, padding: "12px 16px calc(12px + env(safe-area-inset-bottom))", display: "flex", justifyContent: "center", zIndex: 30 }}>
               <div style={{ display: "flex", gap: 10, width: "100%", maxWidth: 528 }}>
                 <button onClick={() => {
                   /* Stamp `now` from the same instant: it only ticks while a timer
                      runs, so a stale value would render one frame of 120s + idle time. */
                   const t = Date.now();
                   setNow(t);
+                  setRestDone(false);
                   setRestEnd(restLeft > 0 ? null : t + 120000);
                 }}
-                  style={{ fontWeight: 600, fontSize: 15, padding: "13px 16px", borderRadius: 14, border: "none", background: restLeft > 0 ? "#E8F8EC" : C.fill, color: restLeft > 0 ? C.greenDark : C.sub, minWidth: 100 }}>
-                  {restLeft > 0 ? `${fmtRest(restLeft)} ✕` : "Rest 2:00"}
+                  style={{ fontWeight: 600, fontSize: 15, padding: "13px 16px", borderRadius: 14, border: "none", background: restLeft > 0 ? "#E8F8EC" : restDone ? C.green : C.fill, color: restLeft > 0 ? C.greenDark : restDone ? "#fff" : C.sub, minWidth: 100, transition: "background .15s" }}>
+                  {restLeft > 0 ? `${fmtRest(restLeft)} ✕` : restDone ? "Go ✓" : "Rest 2:00"}
                 </button>
                 <button onClick={finish} disabled={!loggedSets}
                   style={{ flex: 1, fontWeight: 600, fontSize: 16, padding: "13px 0", borderRadius: 14, border: "none", background: loggedSets ? C.green : C.line, color: loggedSets ? "#fff" : C.sub, transition: "background .15s" }}>
@@ -891,7 +986,7 @@ export default function AdaptTrainer() {
                     {s.light ? <span style={{ color: C.sub, fontWeight: 400, fontSize: 12, marginLeft: 6 }}>light</span> : null}
                     <span style={{ color: C.sub, fontWeight: 400, fontSize: 13, marginLeft: 8 }}>{s.date}</span>
                   </div>
-                  <button onClick={() => deleteSession(s.id)} style={{ background: "transparent", border: "none", color: C.sub, fontSize: 12 }}>Delete</button>
+                  <button onClick={() => deleteSession(s.id)} style={{ background: "transparent", border: "none", color: C.sub, fontSize: 12, padding: "6px 0 6px 12px" }}>Delete</button>
                 </div>
                 <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.7, color: C.sub }}>
                   {s.type === "CARDIO"
