@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 
 /* ============ THEME — clean & airy: Apple Health vernacular ============ */
 const C = {
@@ -200,6 +200,12 @@ const isStandalone = () =>
 const isIOS = () =>
   /iPad|iPhone|iPod/.test(navigator.userAgent) ||
   (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+/* An accidental Finish is expensive: the partial session is saved as a full
+   training day (planning counts it) and the working template resets, wiping
+   whatever wasn't logged yet. So Finish is hold-to-confirm: a quick tap only
+   teaches the gesture, holding through the fill commits. */
+const FINISH_HOLD_MS = 900;
 
 /* ============ DATE HELPERS ============ */
 const todayStr = () => {
@@ -540,6 +546,37 @@ export default function AdaptTrainer() {
     setSavedFlash(true);
     setTimeout(() => setSavedFlash(false), 2500);
   };
+
+  /* hold-to-finish: pointer (or Enter/Space) down starts the fill, releasing
+     early cancels and flashes a "hold to finish" hint so the gesture teaches
+     itself. The timeout firing is the commit. */
+  const holdTimer = useRef(null);
+  const [holdingFinish, setHoldingFinish] = useState(false);
+  const [finishHint, setFinishHint] = useState(false);
+  const startFinishHold = () => {
+    if (!loggedSets || holdTimer.current) return;
+    setFinishHint(false);
+    setHoldingFinish(true);
+    holdTimer.current = setTimeout(() => {
+      holdTimer.current = null;
+      setHoldingFinish(false);
+      finish();
+    }, FINISH_HOLD_MS);
+  };
+  const cancelFinishHold = (early) => {
+    if (holdTimer.current) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+      if (early) setFinishHint(true);
+    }
+    setHoldingFinish(false);
+  };
+  useEffect(() => {
+    if (!finishHint) return;
+    const t = setTimeout(() => setFinishHint(false), 1600);
+    return () => clearTimeout(t);
+  }, [finishHint]);
+
   const deleteSession = async (id) => {
     const next = sessions.filter((s) => s.id !== id);
     setSessions(next);
@@ -959,9 +996,26 @@ export default function AdaptTrainer() {
                   style={{ fontWeight: 600, fontSize: 15, padding: "13px 16px", borderRadius: 14, border: "none", background: restLeft > 0 ? "#E8F8EC" : restDone ? C.green : C.fill, color: restLeft > 0 ? C.greenDark : restDone ? "#fff" : C.sub, minWidth: 100, transition: "background .15s" }}>
                   {restLeft > 0 ? `${fmtRest(restLeft)} ✕` : restDone ? "Go ✓" : "Rest 2:00"}
                 </button>
-                <button onClick={finish} disabled={!loggedSets}
-                  style={{ flex: 1, fontWeight: 600, fontSize: 16, padding: "13px 0", borderRadius: 14, border: "none", background: loggedSets ? C.green : C.line, color: loggedSets ? "#fff" : C.sub, transition: "background .15s" }}>
-                  {savedFlash ? "Saved ✓" : `Finish · ${loggedSets} set${loggedSets === 1 ? "" : "s"}`}
+                <button disabled={!loggedSets}
+                  onPointerDown={startFinishHold}
+                  onPointerUp={() => cancelFinishHold(true)}
+                  onPointerLeave={() => cancelFinishHold(false)}
+                  onPointerCancel={() => cancelFinishHold(false)}
+                  onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !e.repeat) { e.preventDefault(); startFinishHold(); } }}
+                  onKeyUp={(e) => { if (e.key === "Enter" || e.key === " ") cancelFinishHold(true); }}
+                  onContextMenu={(e) => e.preventDefault()}
+                  aria-label="Finish workout — press and hold to confirm"
+                  style={{ flex: 1, fontWeight: 600, fontSize: 16, padding: "13px 0", borderRadius: 14, border: "none", background: loggedSets ? C.green : C.line, color: loggedSets ? "#fff" : C.sub, transition: "background .15s",
+                    position: "relative", overflow: "hidden", WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none", touchAction: "manipulation" }}>
+                  {/* fill sweeps left→right for the length of the hold */}
+                  <span aria-hidden="true" style={{ position: "absolute", top: 0, left: 0, bottom: 0, background: C.greenDark, pointerEvents: "none",
+                    width: holdingFinish ? "100%" : 0, transition: holdingFinish ? `width ${FINISH_HOLD_MS}ms linear` : "none" }} />
+                  <span style={{ position: "relative" }}>
+                    {savedFlash ? "Saved ✓"
+                      : holdingFinish ? "Finished for the day?"
+                      : finishHint ? "Hold to finish"
+                      : `Finish · ${loggedSets} set${loggedSets === 1 ? "" : "s"}`}
+                  </span>
                 </button>
               </div>
             </div>

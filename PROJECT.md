@@ -31,17 +31,26 @@ and the app now carries that story itself:
 - **Rest timer done-cue**: at 0:00 the button flashes a green "Go ✓" for 6 s
   instead of silently snapping back to "Rest 2:00"; tapping it starts the
   next rest.
+- **Hold-to-finish** (owner hit a stray Finish with one exercise done — it
+  saves a partial day AND resets the working template): Finish now commits
+  only after a 900 ms press-and-hold; the label asks "Finished for the
+  day?" while a darker fill sweeps the width of the hold. A quick tap
+  flashes "Hold to finish", so the gesture teaches itself. Pointer and
+  Enter/Space paths; touch-callout/user-select suppressed so iOS long-press
+  doesn't select text.
 - Polish: bottom bar + main padding respect `env(safe-area-inset-bottom)`
   (Finish sat against the iPhone home indicator), effort chip min-height
   34 → 40, bigger tap areas on set-✕ and History Delete, favicon declared
   (browser tabs showed a blank globe and Pages logged a 404).
 - `sw.js` VERSION v3 → v4.
 - Verified: toolchain check first (clean build byte-identical to the
-  committed bundle), then 26 Playwright checks against a Pages-style
+  committed bundle), then 31 Playwright checks against a Pages-style
   sub-path serve — first-run cards, dismiss persistence across reload,
   effort-chip cycle, share clipboard fallback, done-cue via fake clock,
+  quick-tap-doesn't-save / early-release-doesn't-save / full-hold-saves,
   standalone hides the banner, seeded-history user sees none of it and
   still plans FULL_A → FULL_B. Zero console errors.
+- Merged to `main` at the owner's request — this is deployed.
 
 Also asked: "should we add more workouts?" Recommendation delivered: no new
 session *templates* (planToday's 1–6 day/wk ladder is complete; more types

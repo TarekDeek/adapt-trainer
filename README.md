@@ -15,7 +15,9 @@ mode.
   dumbbells, cables, machines, pull-up bar, dip station) and the exercise
   selection changes to match.
 - **Logging** — sets, reps, load, rest timers, plus optional cardio and
-  body/fuel (protein) entries that don't affect your split.
+  body/fuel (protein) entries that don't affect your split. Finishing is
+  **press-and-hold** ("Finished for the day?") so a stray tap can't end the
+  session early.
 - **Effort per set** — after logging reps, a chip appears beside the set: tap
   it to cycle `E / M / H / X` (Easy → Max, fifth tap clears). This is what lets
   the app tell "hit 4×10 easily" apart from "barely survived 4×10", and it
