@@ -12,6 +12,50 @@ Hosted on GitHub Pages so it can be installed to the iPhone Home Screen.
 Not to be confused with **REPS** (`repos/reps`), the other fitness PWA in this
 workspace. Separate app, separate repo. Nothing was touched there.
 
+## Status — 2026-08-30
+
+**Friend-app idea harvest.** The owner shared a friend's tracker (a dark-mode
+artifact app: fixed Sun–Sat schedule, recharts graphs, mood emojis, swipe-to-
+swap with an alternatives catalog) and asked to take the best ideas. Taken,
+each rebuilt Adapt-style rather than copied:
+
+- **Progress tab** (third tab, between Today and History): all-time stat
+  tiles (lifting sessions, sets, volume in current units, cardio minutes),
+  an effort-mix row (E/M/H/X chips with percentages), and a per-exercise
+  trend — top set weight per session, or best reps for bodyweight moves,
+  last 12 sessions, hand-rolled SVG (~40 lines; no recharts — it would have
+  roughly doubled the bundle for one line chart). Tap a dot to read that
+  session (date, top set, felt-word, light-day marker). Chart hue
+  `C.greenDark` validated against the white card (dataviz six-checks pass).
+- **Swap is now a picker, not a blind cycle**: inline list of the
+  equipment-available variants with muscles worked (`m` on every variant),
+  current one marked, warning shown if switching would clear today's logged
+  sets for that exercise.
+- **Barbell tier + catalog expansion**: new `barbell` equipment toggle
+  (defaults off; stored equipment without the key reads as off — additive-
+  safe) gating Barbell Bench/Incline/OHP/Row/Back Squat/Front Squat/RDL/
+  Curl/Close-Grip Bench at the FRONT of their slots, so a barbell gym gets
+  real defaults; ~20 more non-barbell variants APPENDED so existing
+  defaults don't shift (rule added to AGENTS.md). New `calves` slot on
+  LOWER and LEGS templates only.
+- **Reps placeholder shows last time's reps** for the matching set number
+  (weight was already seeded as a value).
+
+Deliberately NOT taken, with reasons: fixed weekly schedule (the opposite of
+planToday — adaptivity is the product); day-streak counter (rewards training
+daily; the app's philosophy forces recovery at 5+/week); mood emojis (the
+effort chip is owner-chosen and feeds progression); date navigation /
+retro-editing past days (planning reads dates; scope and corruption risk);
+hype banner (reason strings already carry grounded motivation); per-day
+storage keys (`adapt:v1` blob is fine in localStorage and re-keying is
+forbidden without migration).
+
+- `sw.js` VERSION v4 → v5. Verified: 48 Playwright checks — everything
+  prior, plus Progress math on seeded history (volume 1,590 exact), chart
+  tap-readout, calves on Legs, barbell promoting BB bench, picker swap,
+  reps placeholder, and defaults preserved for stored equipment lacking
+  the barbell key. Zero console errors. Merged to `main` — deployed.
+
 ## Status — 2026-08-28
 
 **Sharing polish**, from the owner's "I want to share this app with my

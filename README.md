@@ -12,8 +12,9 @@ mode.
 - **Today** — the session the app picked for you (Upper / Lower / Full Body /
   Re-Entry / Recovery-Cardio), chosen from your last 7 days of history.
 - **Gym scoping** — tell it what equipment is on hand (bodyweight only,
-  dumbbells, cables, machines, pull-up bar, dip station) and the exercise
-  selection changes to match.
+  barbell, dumbbells, cables, machines, pull-up bar, dip station) and the
+  exercise selection changes to match. Every exercise has a **Swap** picker
+  listing equipment-matched alternatives with the muscles they work.
 - **Logging** — sets, reps, load, rest timers, plus optional cardio and
   body/fuel (protein) entries that don't affect your split. Finishing is
   **press-and-hold** ("Finished for the day?") so a stray tap can't end the
@@ -28,6 +29,10 @@ mode.
   telling you exactly why ("9 of your last 12 logged sets felt Hard or Max…").
   At most one automatic light day per rolling week; a manual override always
   wins; with no effort logged the feature is silent.
+- **Progress** — all-time totals (sessions, sets, volume, cardio minutes),
+  the mix of how your rated sets felt, and a per-exercise trend of top set
+  weight (best reps for bodyweight moves). Tap a dot for that session's
+  details.
 - **History** — past sessions; the first one you log becomes the baseline
   everything else adapts around.
 - **Backup / restore** — export your data as text you paste somewhere safe, and

@@ -10,7 +10,7 @@ Source is real and builds reproducibly. **Edit `src/`, never `bundle.js`.**
 
 ```
 src/adapt-trainer.jsx   the ENTIRE app — exercise DB, templates, planToday,
-                        suggestTarget, all UI. One component, ~800 lines.
+                        suggestTarget, all UI. One component, ~1,100 lines.
 src/entry.jsx           mounts the app; shims window.storage onto localStorage
 bundle.js               BUILD OUTPUT (minified, React inlined) — generated
 index.html sw.js manifest.webmanifest icon-*.png   PWA shell
@@ -28,6 +28,11 @@ committed rather than gitignored.
 
 - **Never hand-edit `bundle.js`.** It's minified; edits are unreviewable and
   are destroyed by the next `npm run build`. Change `src/` and rebuild.
+- **`VARIANTS` list order is load-bearing.** The first equipment-available
+  variant is a slot's default. Barbell-gated variants sit at the FRONT
+  (invisible until the user turns the barbell toggle on — it defaults off);
+  any other new variant must be APPENDED at the end of its slot's list, or
+  every existing user's default exercise silently changes.
 - **Rebuild and commit `bundle.js` with any `src/` change.** Source and build
   output must never disagree — the deployed app is the build output, so a
   stale bundle means your change silently doesn't ship.
