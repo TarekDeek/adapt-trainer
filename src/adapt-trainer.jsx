@@ -19,73 +19,108 @@ const font = {
 };
 const shadow = "0 1px 3px rgba(0,0,0,0.06)";
 
-/* ============ EXERCISE DATABASE — variants per movement slot, gated by equipment ============ */
+/* ============ EXERCISE DATABASE — variants per movement slot, gated by equipment ============
+   ORDER IS LOAD-BEARING: the first equipment-available variant is the slot's
+   default. Barbell-gated variants sit at the FRONT (invisible until the
+   barbell toggle — off for everyone until they opt in); any other new
+   variant goes at the END of its list so existing users' defaults never
+   shift. `m` = muscles worked, shown in the swap picker only. */
 const VARIANTS = {
   hpush: [
-    { id: "db_bench", name: "Dumbbell Bench Press", eq: ["dumbbells", "bench"] },
-    { id: "machine_chest", name: "Machine Chest Press", eq: ["machines"] },
-    { id: "w_pushup", name: "Weighted Push-Up", eq: [] },
-    { id: "def_pushup", name: "Deficit Push-Up (hands on DBs)", eq: ["dumbbells"] },
-    { id: "pushup", name: "Push-Up", eq: [] },
+    { id: "bb_bench", name: "Barbell Bench Press", eq: ["barbell", "bench"], m: "Chest, front delts, triceps" },
+    { id: "bb_incline", name: "Incline Barbell Press", eq: ["barbell", "bench"], m: "Upper chest, front delts" },
+    { id: "db_bench", name: "Dumbbell Bench Press", eq: ["dumbbells", "bench"], m: "Chest, front delts, triceps" },
+    { id: "machine_chest", name: "Machine Chest Press", eq: ["machines"], m: "Chest, front delts, triceps" },
+    { id: "w_pushup", name: "Weighted Push-Up", eq: [], m: "Chest, front delts, triceps" },
+    { id: "def_pushup", name: "Deficit Push-Up (hands on DBs)", eq: ["dumbbells"], m: "Chest (deep stretch), triceps" },
+    { id: "pushup", name: "Push-Up", eq: [], m: "Chest, front delts, triceps" },
+    { id: "incline_db", name: "Incline DB Press", eq: ["dumbbells", "bench"], m: "Upper chest, front delts" },
   ],
   vpush: [
-    { id: "db_ohp", name: "Seated DB Shoulder Press", eq: ["dumbbells"] },
-    { id: "machine_sh", name: "Machine Shoulder Press", eq: ["machines"] },
-    { id: "pike_pushup", name: "Pike Push-Up", eq: [] },
+    { id: "bb_ohp", name: "Barbell Overhead Press", eq: ["barbell"], m: "Front/side delts, triceps" },
+    { id: "db_ohp", name: "Seated DB Shoulder Press", eq: ["dumbbells"], m: "Front/side delts, triceps" },
+    { id: "machine_sh", name: "Machine Shoulder Press", eq: ["machines"], m: "Front/side delts, triceps" },
+    { id: "pike_pushup", name: "Pike Push-Up", eq: [], m: "Front delts, triceps" },
+    { id: "arnold", name: "Arnold Press", eq: ["dumbbells"], m: "Front/side delts" },
   ],
   vpull: [
-    { id: "pullup", name: "Pull-Up", eq: ["pullup"] },
-    { id: "w_pullup", name: "Weighted Pull-Up", eq: ["pullup"] },
-    { id: "lat_pd", name: "Lat Pulldown", eq: ["machines"] },
-    { id: "assist_pu", name: "Assisted Pull-Up Machine", eq: ["machines"] },
-    { id: "db_pullover", name: "DB Pullover", eq: ["dumbbells", "bench"] },
+    { id: "pullup", name: "Pull-Up", eq: ["pullup"], m: "Lats, mid back, biceps" },
+    { id: "w_pullup", name: "Weighted Pull-Up", eq: ["pullup"], m: "Lats, mid back, biceps" },
+    { id: "lat_pd", name: "Lat Pulldown", eq: ["machines"], m: "Lats, biceps" },
+    { id: "assist_pu", name: "Assisted Pull-Up Machine", eq: ["machines"], m: "Lats, biceps" },
+    { id: "db_pullover", name: "DB Pullover", eq: ["dumbbells", "bench"], m: "Lats, chest" },
+    { id: "ng_pulldown", name: "Neutral-Grip Pulldown", eq: ["machines"], m: "Lats, biceps" },
+    { id: "sa_pulldown", name: "Straight-Arm Pulldown", eq: ["cables"], m: "Lats (isolation)" },
   ],
   hpull: [
-    { id: "cable_row", name: "Seated Cable Row", eq: ["cables"] },
-    { id: "machine_row", name: "Machine Row", eq: ["machines"] },
-    { id: "db_row", name: "One-Arm DB Row", eq: ["dumbbells"] },
-    { id: "inv_row", name: "Inverted Row (smith bar / table)", eq: [] },
+    { id: "bb_row", name: "Barbell Row", eq: ["barbell"], m: "Mid back, lats, rear delts" },
+    { id: "cable_row", name: "Seated Cable Row", eq: ["cables"], m: "Mid back, lats" },
+    { id: "machine_row", name: "Machine Row", eq: ["machines"], m: "Mid back, lats" },
+    { id: "db_row", name: "One-Arm DB Row", eq: ["dumbbells"], m: "Lats, mid back" },
+    { id: "inv_row", name: "Inverted Row (smith bar / table)", eq: [], m: "Mid back, lats, biceps" },
+    { id: "cs_db_row", name: "Chest-Supported DB Row", eq: ["dumbbells", "bench"], m: "Mid back, rear delts" },
   ],
   squat: [
-    { id: "leg_press", name: "Leg Press", eq: ["machines"] },
-    { id: "goblet", name: "Goblet Squat", eq: ["dumbbells"] },
-    { id: "tempo_squat", name: "Tempo Squat (3s down)", eq: [] },
+    { id: "bb_squat", name: "Barbell Back Squat", eq: ["barbell"], m: "Quads, glutes, core" },
+    { id: "front_squat", name: "Front Squat", eq: ["barbell"], m: "Quads, core" },
+    { id: "leg_press", name: "Leg Press", eq: ["machines"], m: "Quads, glutes" },
+    { id: "goblet", name: "Goblet Squat", eq: ["dumbbells"], m: "Quads, glutes" },
+    { id: "tempo_squat", name: "Tempo Squat (3s down)", eq: [], m: "Quads, glutes" },
+    { id: "hack_squat", name: "Hack Squat", eq: ["machines"], m: "Quads, glutes" },
   ],
   singleleg: [
-    { id: "bss", name: "Bulgarian Split Squat", eq: ["dumbbells"] },
-    { id: "walk_lunge", name: "DB Walking Lunge", eq: ["dumbbells"] },
-    { id: "split_squat", name: "Split Squat", eq: [] },
+    { id: "bss", name: "Bulgarian Split Squat", eq: ["dumbbells"], m: "Quads, glutes" },
+    { id: "walk_lunge", name: "DB Walking Lunge", eq: ["dumbbells"], m: "Quads, glutes" },
+    { id: "split_squat", name: "Split Squat", eq: [], m: "Quads, glutes" },
+    { id: "rev_lunge", name: "DB Reverse Lunge", eq: ["dumbbells"], m: "Quads, glutes" },
+    { id: "step_up", name: "Weighted Step-Up", eq: ["dumbbells"], m: "Quads, glutes" },
+    { id: "sl_press", name: "Single-Leg Press", eq: ["machines"], m: "Quads, glutes" },
   ],
   hinge: [
-    { id: "leg_curl", name: "Leg Curl Machine", eq: ["machines"] },
-    { id: "db_rdl", name: "DB Romanian Deadlift", eq: ["dumbbells"] },
-    { id: "slide_curl", name: "Sliding Leg Curl", eq: [] },
+    { id: "bb_rdl", name: "Barbell Romanian Deadlift", eq: ["barbell"], m: "Hamstrings, glutes" },
+    { id: "leg_curl", name: "Leg Curl Machine", eq: ["machines"], m: "Hamstrings" },
+    { id: "db_rdl", name: "DB Romanian Deadlift", eq: ["dumbbells"], m: "Hamstrings, glutes" },
+    { id: "slide_curl", name: "Sliding Leg Curl", eq: [], m: "Hamstrings (eccentric)" },
+    { id: "seated_curl", name: "Seated Leg Curl", eq: ["machines"], m: "Hamstrings" },
   ],
   sidedelt: [
-    { id: "lat_raise", name: "DB Lateral Raise", eq: ["dumbbells"] },
-    { id: "cable_lat", name: "Cable Lateral Raise", eq: ["cables"] },
+    { id: "lat_raise", name: "DB Lateral Raise", eq: ["dumbbells"], m: "Side delts" },
+    { id: "cable_lat", name: "Cable Lateral Raise", eq: ["cables"], m: "Side delts" },
+    { id: "machine_lat", name: "Machine Lateral Raise", eq: ["machines"], m: "Side delts" },
   ],
   reardelt: [
-    { id: "face_pull", name: "Face Pull", eq: ["cables"] },
-    { id: "rev_fly", name: "DB Reverse Fly", eq: ["dumbbells"] },
-    { id: "prone_y", name: "Prone Y Raise", eq: [] },
+    { id: "face_pull", name: "Face Pull", eq: ["cables"], m: "Rear delts, mid traps" },
+    { id: "rev_fly", name: "DB Reverse Fly", eq: ["dumbbells"], m: "Rear delts" },
+    { id: "prone_y", name: "Prone Y Raise", eq: [], m: "Rear delts, lower traps" },
+    { id: "rev_pec", name: "Reverse Pec-Deck", eq: ["machines"], m: "Rear delts, mid traps" },
   ],
   biceps: [
-    { id: "chinup", name: "Chin-Up", eq: ["pullup"] },
-    { id: "db_curl", name: "DB Curl", eq: ["dumbbells"] },
-    { id: "cable_curl", name: "Cable Curl", eq: ["cables"] },
+    { id: "bb_curl", name: "Barbell Curl", eq: ["barbell"], m: "Biceps" },
+    { id: "chinup", name: "Chin-Up", eq: ["pullup"], m: "Biceps, lats" },
+    { id: "db_curl", name: "DB Curl", eq: ["dumbbells"], m: "Biceps" },
+    { id: "cable_curl", name: "Cable Curl", eq: ["cables"], m: "Biceps" },
+    { id: "hammer_curl", name: "Hammer Curl", eq: ["dumbbells"], m: "Biceps, forearms" },
+    { id: "preacher_curl", name: "Preacher Curl Machine", eq: ["machines"], m: "Biceps (stretch)" },
   ],
   triceps: [
-    { id: "pushdown", name: "Cable Pushdown", eq: ["cables"] },
-    { id: "skull", name: "DB Skullcrusher", eq: ["dumbbells", "bench"] },
-    { id: "dips", name: "Dips", eq: ["dip"] },
-    { id: "diamond_pu", name: "Diamond Push-Up", eq: [] },
+    { id: "cg_bench", name: "Close-Grip Bench Press", eq: ["barbell", "bench"], m: "Triceps, chest" },
+    { id: "pushdown", name: "Cable Pushdown", eq: ["cables"], m: "Triceps" },
+    { id: "skull", name: "DB Skullcrusher", eq: ["dumbbells", "bench"], m: "Triceps (long head)" },
+    { id: "dips", name: "Dips", eq: ["dip"], m: "Triceps, lower chest" },
+    { id: "diamond_pu", name: "Diamond Push-Up", eq: [], m: "Triceps, chest" },
+    { id: "oh_cable_tri", name: "Overhead Cable Extension", eq: ["cables"], m: "Triceps (long head)" },
   ],
   core: [
-    { id: "hang_raise", name: "Hanging Leg Raise", eq: ["pullup"] },
-    { id: "hollow", name: "Hollow Hold (secs)", eq: [] },
-    { id: "leg_raise", name: "Lying Leg Raise", eq: [] },
-    { id: "cable_crunch", name: "Cable Crunch", eq: ["cables"] },
+    { id: "hang_raise", name: "Hanging Leg Raise", eq: ["pullup"], m: "Abs, hip flexors" },
+    { id: "hollow", name: "Hollow Hold (secs)", eq: [], m: "Abs, deep core" },
+    { id: "leg_raise", name: "Lying Leg Raise", eq: [], m: "Abs, hip flexors" },
+    { id: "cable_crunch", name: "Cable Crunch", eq: ["cables"], m: "Abs" },
+  ],
+  calves: [
+    { id: "calf_machine", name: "Standing Calf Raise (machine)", eq: ["machines"], m: "Calves (gastrocnemius)" },
+    { id: "seated_calf", name: "Seated Calf Raise", eq: ["machines"], m: "Calves (soleus)" },
+    { id: "db_calf", name: "DB Standing Calf Raise", eq: ["dumbbells"], m: "Calves" },
+    { id: "sl_calf", name: "Single-Leg Calf Raise", eq: [], m: "Calves" },
   ],
 };
 
@@ -93,7 +128,7 @@ const SLOT_LABEL = {
   hpush: "Horizontal push", vpush: "Vertical push", vpull: "Vertical pull",
   hpull: "Horizontal pull", squat: "Squat", singleleg: "Single leg",
   hinge: "Hamstrings", sidedelt: "Side delts", reardelt: "Rear delts",
-  biceps: "Biceps", triceps: "Triceps", core: "Core",
+  biceps: "Biceps", triceps: "Triceps", core: "Core", calves: "Calves",
 };
 const MAIN_SLOTS = ["hpush", "vpush", "vpull", "hpull", "squat", "singleleg", "hinge"];
 const schemeFor = (slot, reentry, light) =>
@@ -167,10 +202,10 @@ const TEMPLATES = {
   FULL_B: { label: "Full Body B", slots: ["vpush", "vpull", "singleleg", "hinge", "core"] },
   REENTRY: { label: "Re-Entry Full Body", slots: ["hpush", "hpull", "squat", "core"] },
   UPPER: { label: "Upper Body", slots: ["hpush", "vpull", "vpush", "hpull", "biceps", "triceps"] },
-  LOWER: { label: "Lower Body", slots: ["squat", "hinge", "singleleg", "core"] },
+  LOWER: { label: "Lower Body", slots: ["squat", "hinge", "singleleg", "calves", "core"] },
   PUSH: { label: "Push", slots: ["hpush", "vpush", "sidedelt", "triceps", "core"] },
   PULL: { label: "Pull", slots: ["vpull", "hpull", "reardelt", "biceps"] },
-  LEGS: { label: "Legs", slots: ["squat", "hinge", "singleleg", "core"] },
+  LEGS: { label: "Legs", slots: ["squat", "hinge", "singleleg", "calves", "core"] },
   CARDIO_DAY: { label: "Recovery / Cardio", slots: [] },
 };
 
@@ -335,11 +370,55 @@ function Ring({ done, total }) {
   );
 }
 
+/* Single-series trend, drawn to the house chart rules: 2px line, ≥8px dots
+   with a 2px surface ring, hairline gridlines at the data extremes (their
+   values in the left gutter), one direct label on the latest point, text in
+   text tokens never the data color. Tapping a point selects it — the touch
+   analog of a hover tooltip; the parent renders the readout line. */
+function TrendChart({ pts, fmt, selected, onSelect }) {
+  const W = 320, H = 150, padL = 40, padR = 14, padT = 18, padB = 20;
+  const vals = pts.map((p) => p.v);
+  const dLo = Math.min(...vals), dHi = Math.max(...vals);
+  const span = dHi - dLo || Math.max(1, dHi * 0.1);
+  const lo = dLo - span * 0.15, hi = dHi + span * 0.15;
+  const plotW = W - padL - padR;
+  const x = (i) => (pts.length === 1 ? padL + plotW / 2 : padL + (i * plotW) / (pts.length - 1));
+  const y = (v) => padT + (1 - (v - lo) / (hi - lo)) * (H - padT - padB);
+  const path = pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ");
+  const lastIdx = pts.length - 1;
+  const step = pts.length > 1 ? plotW / (pts.length - 1) : plotW;
+  const labelX = Math.min(Math.max(x(lastIdx), padL + 16), W - padR - 2);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
+      {[dHi, ...(dLo !== dHi ? [dLo] : [])].map((v) => (
+        <g key={v}>
+          <line x1={padL} x2={W - padR} y1={y(v)} y2={y(v)} stroke={C.line} strokeWidth="1" />
+          <text x={padL - 6} y={y(v) + 3.5} textAnchor="end" fontSize="10" fill={C.sub}>{v}</text>
+        </g>
+      ))}
+      {pts.length > 1 && <path d={path} fill="none" stroke={C.greenDark} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />}
+      {pts.map((p, i) => (
+        <circle key={i} cx={x(i)} cy={y(p.v)} r={i === selected ? 6 : 4.5} fill={C.greenDark} stroke={C.card} strokeWidth="2" />
+      ))}
+      <text x={labelX} y={y(pts[lastIdx].v) - 10} textAnchor={x(lastIdx) > W - padR - 30 ? "end" : "middle"}
+        fontSize="11" fontWeight="600" fill={C.ink}>{fmt(pts[lastIdx].v)}</text>
+      <text x={padL} y={H - 4} fontSize="10" fill={C.sub}>{pts[0].date.slice(5)}</text>
+      {pts.length > 1 && <text x={W - padR} y={H - 4} textAnchor="end" fontSize="10" fill={C.sub}>{pts[lastIdx].date.slice(5)}</text>}
+      {pts.map((p, i) => (
+        <rect key={"h" + i} x={Math.max(padL - 8, x(i) - step / 2)} y="0" width={step} height={H}
+          fill="transparent" onClick={() => onSelect(i)} style={{ cursor: "pointer" }} />
+      ))}
+    </svg>
+  );
+}
+
 /* ============ COMPONENT ============ */
 export default function AdaptTrainer() {
   const [loaded, setLoaded] = useState(false);
   const [sessions, setSessions] = useState([]);
-  const [equipment, setEquipment] = useState({ machines: true, cables: true, dumbbells: true, bench: true, dip: false, pullup: false });
+  /* `barbell` was added later: stored equipment objects without the key read
+     as off, which is the old behavior — additive-safe, no migration needed */
+  const [equipment, setEquipment] = useState({ barbell: false, machines: true, cables: true, dumbbells: true, bench: true, dip: false, pullup: false });
   const [units, setUnits] = useState("lb");
   const [bw, setBw] = useState("");
   const [view, setView] = useState("today");
@@ -452,6 +531,7 @@ export default function AdaptTrainer() {
       }).filter(Boolean)
     );
     setExpanded(0);
+    setSwapOpen(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     /* Lifting-session count, NOT sessions.length: logging cardio mid-workout
        must never rebuild the template — it would wipe the in-progress sets,
@@ -483,17 +563,20 @@ export default function AdaptTrainer() {
     return lightHit;
   };
 
-  const swapVariant = (idx) =>
+  /* Swap used to blind-cycle variants; now it opens an inline picker with
+     muscles worked, so choosing is informed. Same semantics as before:
+     switching resets the exercise's logged sets (they belong to the exId). */
+  const [swapOpen, setSwapOpen] = useState(null);
+  const pickVariant = (idx, v) => {
+    setSwapOpen(null);
     setEntries((prev) => {
       const cur = prev[idx];
-      const opts = VARIANTS[cur.slot].filter(avail);
-      if (opts.length < 2) return prev;
-      const i = opts.findIndex((v) => v.id === cur.exId);
-      const nxt = opts[(i + 1) % opts.length];
+      if (cur.exId === v.id) return prev;
       const cp = [...prev];
-      cp[idx] = { ...cur, exId: nxt.id, name: nxt.name, sets: [] };
+      cp[idx] = { ...cur, exId: v.id, name: v.name, sets: [] };
       return cp;
     });
+  };
   const addSet = (idx) =>
     setEntries((p) => {
       const c = [...p];
@@ -601,11 +684,57 @@ export default function AdaptTrainer() {
   const proteinG = bwNum ? Math.round(units === "lb" ? bwNum * 0.8 : bwNum * 1.8) : null;
   const calsMaint = bwNum ? Math.round(units === "lb" ? bwNum * 15 : bwNum * 33) : null;
   const freq7 = sessions.filter((s) => diffDays(s.date, todayStr()) <= 7 && s.date <= todayStr() && s.type !== "CARDIO").length;
+
+  /* ---- Progress tab: all-time stats + per-exercise trend (read-only over history) ---- */
+  const allStats = useMemo(() => {
+    let liftCount = 0, setCount = 0, volume = 0, cardioMin = 0;
+    const eff = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    for (const s of sessions) {
+      if (s.type === "CARDIO") {
+        for (const e of s.entries || []) cardioMin += parseInt(e.minutes, 10) || 0;
+        continue;
+      }
+      liftCount++;
+      for (const e of s.entries || [])
+        for (const st of e.sets || []) {
+          if (!st.r) continue;
+          setCount++;
+          const w = parseFloat(st.w), r = parseInt(st.r, 10) || 0;
+          if (w > 0) volume += w * r;
+          const ef = setEffort(st);
+          if (ef) eff[ef]++;
+        }
+    }
+    return { liftCount, setCount, volume: Math.round(volume), cardioMin, eff, rated: eff[1] + eff[2] + eff[3] + eff[4] };
+  }, [sessions]);
+  const exHistory = useMemo(() => {
+    const map = new Map();
+    for (const s of sessions) {
+      if (s.type === "CARDIO") continue;
+      for (const e of s.entries || []) {
+        const sets = (e.sets || []).filter((st) => st.r);
+        if (!sets.length) continue;
+        let topW = 0, repsAtTop = 0, topR = 0;
+        for (const st of sets) {
+          const w = parseFloat(st.w) || 0, r = parseInt(st.r, 10) || 0;
+          if (w > topW) { topW = w; repsAtTop = r; }
+          if (r > topR) topR = r;
+        }
+        if (!map.has(e.exId)) map.set(e.exId, { id: e.exId, name: e.name, points: [] });
+        const rec = map.get(e.exId);
+        rec.name = e.name;
+        rec.points.push({ date: s.date, topW, repsAtTop, topR, ef: hardestEffort(sets), light: !!s.light });
+      }
+    }
+    return [...map.values()].sort((a, b) => b.points.length - a.points.length);
+  }, [sessions]);
+  const [progressEx, setProgressEx] = useState(null);
+  const [chartPt, setChartPt] = useState(null);
   useEffect(() => {
     if (loaded && activeType === "CARDIO_DAY") setCardioOpen(true);
   }, [activeType, loaded]);
 
-  const eqSummary = [["machines", "Machines"], ["cables", "Cables"], ["dumbbells", "DBs"], ["bench", "Bench"], ["dip", "Dips"], ["pullup", "Bar"]]
+  const eqSummary = [["barbell", "Barbell"], ["machines", "Machines"], ["cables", "Cables"], ["dumbbells", "DBs"], ["bench", "Bench"], ["dip", "Dips"], ["pullup", "Pull-up"]]
     .filter(([k]) => equipment[k]).map(([, l]) => l).join(" · ") || "Bodyweight only";
 
   const dismissInstallHint = () => {
@@ -668,7 +797,7 @@ export default function AdaptTrainer() {
           <div>
             <div style={{ fontSize: 13, color: C.sub, fontWeight: 500 }}>{prettyDate()}</div>
             <h1 style={{ fontSize: 30, fontWeight: 700, margin: "2px 0 0", letterSpacing: "-0.02em" }}>
-              {view === "today" ? "Today" : "History"}
+              {view === "today" ? "Today" : view === "progress" ? "Progress" : "History"}
             </h1>
           </div>
           {view === "today" && <Ring done={loggedSets} total={totalPlanned} />}
@@ -676,10 +805,10 @@ export default function AdaptTrainer() {
 
         {/* tabs */}
         <div style={{ display: "flex", background: C.line, borderRadius: 10, padding: 2, marginBottom: 16 }}>
-          {["today", "history"].map((t) => (
+          {[["today", "Today"], ["progress", "Progress"], ["history", "History"]].map(([t, label]) => (
             <button key={t} onClick={() => setView(t)}
               style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", fontSize: 14, fontWeight: 600, background: view === t ? C.card : "transparent", color: view === t ? C.ink : C.sub, boxShadow: view === t ? shadow : "none", transition: "all .15s" }}>
-              {t === "today" ? "Today" : "History"}
+              {label}
             </button>
           ))}
         </div>
@@ -777,7 +906,7 @@ export default function AdaptTrainer() {
                 <div style={{ padding: "0 18px 16px", borderTop: `1px solid ${C.line}` }}>
                   <div style={{ fontSize: 12, color: C.sub, fontWeight: 600, margin: "12px 0 8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>This gym has</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {[["machines", "Machines"], ["cables", "Cables"], ["dumbbells", "Dumbbells"], ["bench", "Bench"], ["dip", "Dip station"], ["pullup", "Pull-up bar"]].map(([k, label]) => (
+                    {[["barbell", "Barbell"], ["machines", "Machines"], ["cables", "Cables"], ["dumbbells", "Dumbbells"], ["bench", "Bench"], ["dip", "Dip station"], ["pullup", "Pull-up bar"]].map(([k, label]) => (
                       <button key={k} onClick={() => toggleEq(k)}
                         style={{ padding: "7px 14px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: "none", background: equipment[k] ? C.green : C.fill, color: equipment[k] ? "#fff" : C.sub, transition: "all .15s" }}>
                         {label}
@@ -874,7 +1003,7 @@ export default function AdaptTrainer() {
               return (
                 <section key={e.slot + e.exId}
                   style={{ background: C.card, borderRadius: 16, boxShadow: shadow, marginBottom: 10, overflow: "hidden" }}>
-                  <button onClick={() => setExpanded(open ? null : idx)}
+                  <button onClick={() => { setExpanded(open ? null : idx); setSwapOpen(null); }}
                     style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", background: "transparent", border: "none", textAlign: "left" }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12, color: C.sub, fontWeight: 500 }}>{SLOT_LABEL[e.slot]} · {e.scheme}</div>
@@ -906,7 +1035,7 @@ export default function AdaptTrainer() {
                           <input inputMode="decimal" placeholder={units} value={s.w} onChange={(ev) => setVal(idx, si, "w", ev.target.value)}
                             style={{ ...inputStyle, boxSizing: "border-box", width: 70, minWidth: 58, flexShrink: 1, padding: "9px 6px" }} />
                           <span style={{ color: C.sub }}>×</span>
-                          <input inputMode="numeric" placeholder="reps" value={s.r} onChange={(ev) => setVal(idx, si, "r", ev.target.value)}
+                          <input inputMode="numeric" placeholder={perf && perf.sets[si] && perf.sets[si].r ? String(perf.sets[si].r) : "reps"} value={s.r} onChange={(ev) => setVal(idx, si, "r", ev.target.value)}
                             style={{ ...inputStyle, boxSizing: "border-box", width: 52, minWidth: 48, flexShrink: 1, padding: "9px 6px" }} />
                           {/* Effort chip — tap cycles E→M→H→X→off; only asked once the set is logged */}
                           {s.r ? (
@@ -929,9 +1058,9 @@ export default function AdaptTrainer() {
                           + Add set
                         </button>
                         {swappable && (
-                          <button onClick={() => swapVariant(idx)}
-                            style={{ padding: "10px 14px", borderRadius: 12, border: "none", background: C.fill, color: C.sub, fontWeight: 500, fontSize: 14 }}>
-                            Swap
+                          <button onClick={() => setSwapOpen(swapOpen === idx ? null : idx)}
+                            style={{ padding: "10px 14px", borderRadius: 12, border: "none", background: swapOpen === idx ? C.line : C.fill, color: C.sub, fontWeight: 500, fontSize: 14 }}>
+                            {swapOpen === idx ? "Close" : "Swap"}
                           </button>
                         )}
                         <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(e.name + " form")}`} target="_blank" rel="noreferrer"
@@ -939,6 +1068,31 @@ export default function AdaptTrainer() {
                           Form
                         </a>
                       </div>
+
+                      {/* variant picker — informed swap instead of blind cycling */}
+                      {swapOpen === idx && (
+                        <div style={{ marginTop: 10, background: C.fill, borderRadius: 12, overflow: "hidden" }}>
+                          {e.sets.length > 0 && (
+                            <div style={{ fontSize: 12, color: "#C0362C", padding: "8px 12px 2px" }}>
+                              Switching clears the sets you've logged for this exercise today.
+                            </div>
+                          )}
+                          {VARIANTS[e.slot].filter(avail).map((v, vi, arr) => {
+                            const cur = v.id === e.exId;
+                            return (
+                              <button key={v.id} onClick={() => pickVariant(idx, v)}
+                                style={{ width: "100%", textAlign: "left", padding: "10px 12px", background: "transparent", border: "none",
+                                  borderBottom: vi < arr.length - 1 ? `1px solid ${C.line}` : "none", display: "flex", alignItems: "center", gap: 8 }}>
+                                <span style={{ flex: 1, minWidth: 0 }}>
+                                  <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: C.ink }}>{v.name}</span>
+                                  {v.m && <span style={{ display: "block", fontSize: 12, color: C.sub, marginTop: 1 }}>{v.m}</span>}
+                                </span>
+                                {cur && <span style={{ fontSize: 12, fontWeight: 600, color: C.greenDark, flexShrink: 0 }}>current ✓</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
                 </section>
@@ -1019,6 +1173,88 @@ export default function AdaptTrainer() {
                 </button>
               </div>
             </div>
+          </>
+        )}
+
+        {view === "progress" && (
+          <>
+            {!sessions.length ? (
+              <p style={{ color: C.sub, fontSize: 14, textAlign: "center", marginTop: 40 }}>
+                Nothing to chart yet — log your first session and this fills in.
+              </p>
+            ) : (
+              <>
+                {/* all-time tiles */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+                  {[
+                    ["Sessions", allStats.liftCount.toLocaleString(), "lifting, all time"],
+                    ["Sets", allStats.setCount.toLocaleString(), "logged"],
+                    ["Volume", allStats.volume.toLocaleString(), `${units} moved (weight × reps)`],
+                    ["Cardio", allStats.cardioMin.toLocaleString(), "minutes"],
+                  ].map(([label, value, sub]) => (
+                    <div key={label} style={{ background: C.card, borderRadius: 16, boxShadow: shadow, padding: "12px 16px" }}>
+                      <div style={{ fontSize: 12, color: C.sub, fontWeight: 600 }}>{label}</div>
+                      <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.01em", margin: "2px 0 0" }}>{value}</div>
+                      <div style={{ fontSize: 11.5, color: C.sub }}>{sub}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* effort mix — identity is the chip letter, never color alone */}
+                {allStats.rated > 0 && (
+                  <section style={{ background: C.card, borderRadius: 16, boxShadow: shadow, padding: "14px 16px", marginBottom: 10 }}>
+                    <div style={{ fontSize: 12, color: C.sub, fontWeight: 600, marginBottom: 8 }}>
+                      How your {allStats.rated} rated set{allStats.rated === 1 ? "" : "s"} felt
+                    </div>
+                    <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                      {EFFORT_OPTS.map((o) => (
+                        <div key={o.v} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ width: 24, height: 24, borderRadius: 999, background: o.v === 4 ? C.red : C.green, color: "#fff", fontSize: 12, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                            {EFFORT_LETTER[o.v]}
+                          </span>
+                          <span style={{ fontSize: 13, fontWeight: 600 }}>{Math.round((allStats.eff[o.v] / allStats.rated) * 100)}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* per-exercise trend */}
+                {exHistory.length > 0 && (() => {
+                  const sel = exHistory.find((ex) => ex.id === progressEx) || exHistory[0];
+                  const weightBased = sel.points.some((p) => p.topW > 0);
+                  const pts = sel.points.slice(-12).map((p) => ({ ...p, v: weightBased ? p.topW : p.topR }));
+                  const selIdx = chartPt !== null && chartPt < pts.length ? chartPt : pts.length - 1;
+                  const p = pts[selIdx];
+                  return (
+                    <section style={{ background: C.card, borderRadius: 16, boxShadow: shadow, padding: "14px 16px", marginBottom: 10 }}>
+                      <div style={{ fontSize: 12, color: C.sub, fontWeight: 600, marginBottom: 8 }}>
+                        {weightBased ? "Top set weight per session" : "Best reps per session"} · tap a dot for details
+                      </div>
+                      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, WebkitOverflowScrolling: "touch" }}>
+                        {exHistory.map((ex) => (
+                          <button key={ex.id} onClick={() => { setProgressEx(ex.id); setChartPt(null); }}
+                            style={{ padding: "6px 12px", borderRadius: 999, fontSize: 13, fontWeight: 500, border: "none", whiteSpace: "nowrap", flexShrink: 0,
+                              background: ex.id === sel.id ? C.green : C.fill, color: ex.id === sel.id ? "#fff" : C.sub }}>
+                            {ex.name}
+                          </button>
+                        ))}
+                      </div>
+                      <TrendChart pts={pts} selected={selIdx} onSelect={setChartPt}
+                        fmt={(v) => (weightBased ? `${v} ${units}` : `${v} reps`)} />
+                      <div style={{ fontSize: 13, color: C.sub, marginTop: 6 }}>
+                        <strong style={{ color: C.ink }}>{p.date}</strong> · {weightBased ? `${p.topW} ${units} × ${p.repsAtTop}` : `${p.topR} reps`}
+                        {p.ef ? ` · felt ${EFFORT_WORD[p.ef]}` : ""}{p.light ? " · light day" : ""}
+                        {sel.points.length > pts.length ? ` · last ${pts.length} of ${sel.points.length} sessions` : ""}
+                      </div>
+                      {pts.length === 1 && (
+                        <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>One session so far — the line appears at two.</div>
+                      )}
+                    </section>
+                  );
+                })()}
+              </>
+            )}
           </>
         )}
 

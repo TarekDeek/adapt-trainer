@@ -1,7 +1,7 @@
 /* Bump VERSION on every deploy that changes a cached file.
    Even if you forget, stale-while-revalidate below means a new build still
    lands on the next launch — the version bump just makes it immediate. */
-const VERSION = "v4";
+const VERSION = "v5";
 const CACHE = `adapt-${VERSION}`;
 const ASSETS = ["./", "./index.html", "./bundle.js", "./manifest.webmanifest", "./icon-180.png"];
 
