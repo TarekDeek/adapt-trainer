@@ -12,6 +12,32 @@ Hosted on GitHub Pages so it can be installed to the iPhone Home Screen.
 Not to be confused with **REPS** (`repos/reps`), the other fitness PWA in this
 workspace. Separate app, separate repo. Nothing was touched there.
 
+## Status — 2026-10-24 · second pass
+
+**Compact Today** (owner: "I don't like scrolling… welcome message can be
+removed and recessed in settings… machine editing can also get moved to a
+settings page"):
+
+- **New Settings view** behind a gear button in the header (SVG icon;
+  highlighted when open; tabs stay three — Settings is not a tab). The
+  whole former collapsed Edit panel moved there as separate cards: This gym
+  has (equipment chips, plus an honest note that mid-workout changes
+  rebuild the session), Body & fuel, Backup, Share, and **How it works**
+  (the welcome text, recessed permanently).
+- **The equipment/Edit row is gone from Today.** Today is now: plan card →
+  warm-up → exercises → cardio. The plan card plus the first open exercise
+  fit the first screen at 375×667.
+- **Welcome card is dismissible** (✕, persisted in new optional key
+  `adapt:hideWelcome`) and its wording now points at the gear. It still
+  auto-retires at the first saved session; the same text lives in Settings.
+- Backup-nudge "Export now" navigates to Settings with the export filled.
+- The units toggle button gained an explicit `color: C.ink` (it had been
+  riding the UA default, which would have flipped wrong in dark mode).
+- `sw.js` VERSION v6 → v7. Suite updated for the new navigation: 55 checks,
+  all green (welcome ✕ persistence, settings contents, gear round-trips,
+  barbell toggle via Settings, Export-now jump), zero console errors.
+  Merged to `main` — deployed.
+
 ## Status — 2026-10-24
 
 **Two-months-in quality pass** (owner asked "any improvements?"; ~8 weeks of

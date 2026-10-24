@@ -11,10 +11,11 @@ mode.
 
 - **Today** — the session the app picked for you (Upper / Lower / Full Body /
   Re-Entry / Recovery-Cardio), chosen from your last 7 days of history.
-- **Gym scoping** — tell it what equipment is on hand (bodyweight only,
-  barbell, dumbbells, cables, machines, pull-up bar, dip station) and the
-  exercise selection changes to match. Every exercise has a **Swap** picker
-  listing equipment-matched alternatives with the muscles they work.
+- **Gym scoping** — tell it what equipment is on hand (Settings, behind the
+  gear: bodyweight only, barbell, dumbbells, cables, machines, pull-up bar,
+  dip station) and the exercise selection changes to match. Every exercise
+  has a **Swap** picker listing equipment-matched alternatives with the
+  muscles they work.
 - **Logging** — sets, reps, load, rest timers, plus optional cardio and
   body/fuel (protein) entries that don't affect your split. Finishing is
   **press-and-hold** ("Finished for the day?") so a stray tap can't end the
@@ -51,6 +52,7 @@ Everything lives in `localStorage` on the device, under these keys:
 | `adapt:draft` | in-progress session, so a reload mid-workout doesn't lose it |
 | `adapt:ping` | storage-availability probe |
 | `adapt:hideInstallHint` | set once the "Add to Home Screen" banner is dismissed |
+| `adapt:hideWelcome` | set once the first-run welcome card is dismissed |
 | `adapt:backupMeta` | when you last exported / dismissed the backup reminder |
 
 The bundle contains **zero `fetch` calls**. Nothing leaves the phone, which also
@@ -58,7 +60,7 @@ means there is no server-side copy — **the Backup export is your only backup.*
 Once you have 8+ sessions logged, the app reminds you to export every few
 weeks until you do.
 Deleting the PWA from the Home Screen can clear its storage with it.
-(The Edit → Share button opens the phone's share sheet with the app's URL —
+(The Settings → Share button opens the phone's share sheet with the app's URL —
 an OS affordance, not a network call; the zero-fetch guarantee stands.)
 
 ## Install on iPhone
@@ -80,8 +82,8 @@ https://tarekdeek.github.io/adapt-trainer/
 ```
 
 The GitHub repository page shows source code; the Pages URL above *is* the
-app. The in-app **Edit → Share** button opens the phone's share sheet with
-exactly that link.
+app. The in-app **Settings (gear) → Share** button opens the phone's share
+sheet with exactly that link.
 
 Everyone who opens it gets their own independent copy: data lives in that
 phone's `localStorage`, so nobody sees anyone else's log and no account or

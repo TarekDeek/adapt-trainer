@@ -39,7 +39,8 @@ committed rather than gitignored.
 - **Never change a storage key or set/session shape without a migration.**
   State is `localStorage`-only (`adapt:v1` sessions+settings, `adapt:draft`
   mid-workout autosave, `adapt:ping` probe, `adapt:hideInstallHint`
-  install-banner dismissal, `adapt:backupMeta` export/dismiss dates for the
+  install-banner dismissal, `adapt:hideWelcome` welcome-card dismissal,
+  `adapt:backupMeta` export/dismiss dates for the
   backup reminder). There is no server copy: a rename
   orphans the user's entire training history with no way back. New fields must
   be *optional* and every reader must handle their absence — this is how `e`
