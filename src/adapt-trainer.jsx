@@ -425,11 +425,14 @@ function TrendChart({ pts, fmt, selected, onSelect }) {
   );
 }
 
+/* A filled cog (SF-Symbols-style). The first cut was a circle with radiating
+   spokes — it read as a sun, i.e. a theme toggle, which this app pointedly
+   does not have (appearance follows the system). Generated as a real gear
+   outline (8 teeth, arc gaps) with the hub punched out via evenodd. */
 function GearIcon({ color }) {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="3.2" />
-      <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1" />
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill={color} fillRule="evenodd" d="M10.22 4.3L10.52 1.5A10.6 10.6 0 0 1 13.48 1.5L13.78 4.3A7.9 7.9 0 0 1 16.19 5.3L18.38 3.53A10.6 10.6 0 0 1 20.47 5.62L18.7 7.81A7.9 7.9 0 0 1 19.7 10.22L22.5 10.52A10.6 10.6 0 0 1 22.5 13.48L19.7 13.78A7.9 7.9 0 0 1 18.7 16.19L20.47 18.38A10.6 10.6 0 0 1 18.38 20.47L16.19 18.7A7.9 7.9 0 0 1 13.78 19.7L13.48 22.5A10.6 10.6 0 0 1 10.52 22.5L10.22 19.7A7.9 7.9 0 0 1 7.81 18.7L5.62 20.47A10.6 10.6 0 0 1 3.53 18.38L5.3 16.19A7.9 7.9 0 0 1 4.3 13.78L1.5 13.48A10.6 10.6 0 0 1 1.5 10.52L4.3 10.22A7.9 7.9 0 0 1 5.3 7.81L3.53 5.62A10.6 10.6 0 0 1 5.62 3.53L7.81 5.3A7.9 7.9 0 0 1 10.22 4.3ZM15.6 12A3.6 3.6 0 1 0 8.4 12A3.6 3.6 0 1 0 15.6 12Z" />
     </svg>
   );
 }

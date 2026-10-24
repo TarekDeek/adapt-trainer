@@ -18,8 +18,10 @@ workspace. Separate app, separate repo. Nothing was touched there.
 removed and recessed in settings… machine editing can also get moved to a
 settings page"):
 
-- **New Settings view** behind a gear button in the header (SVG icon;
-  highlighted when open; tabs stay three — Settings is not a tab). The
+- **New Settings view** behind a gear button in the header (a generated
+  filled-cog SVG — the first cut, a circle with radiating spokes, read as a
+  sun/theme toggle and the owner flagged it; highlighted when open; tabs
+  stay three — Settings is not a tab). The
   whole former collapsed Edit panel moved there as separate cards: This gym
   has (equipment chips, plus an honest note that mid-workout changes
   rebuild the session), Body & fuel, Backup, Share, and **How it works**
