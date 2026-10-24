@@ -1,18 +1,31 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 
-/* ============ THEME — clean & airy: Apple Health vernacular ============ */
-const C = {
-  bg: "#F2F2F7",
-  card: "#FFFFFF",
-  ink: "#1C1C1E",
-  sub: "#8E8E93",
-  line: "#E5E5EA",
-  green: "#34C759",
-  greenDark: "#248A3D",
-  blue: "#007AFF",
-  fill: "#F7F7FA",
-  red: "#FF3B30",
+/* ============ THEME — clean & airy: Apple Health vernacular ============
+   Two palettes, same token names; `C` itself is swapped so every existing
+   `C.x` reference works unchanged — the component re-renders on scheme
+   change and all styles read C at render time. Dark steps follow the iOS
+   dark system colors. `greenDark` doubles as text-on-tint and the chart
+   hue, so each mode's value is contrast-validated against that mode's
+   card surface (dataviz six-checks, both modes). */
+const PALETTES = {
+  light: {
+    bg: "#F2F2F7", card: "#FFFFFF", ink: "#1C1C1E", sub: "#8E8E93",
+    line: "#E5E5EA", green: "#34C759", greenDark: "#248A3D", blue: "#007AFF",
+    fill: "#F7F7FA", red: "#FF3B30",
+    tintBg: "#E8F8EC", errBg: "#FFF3F2", errBorder: "#FFC7C2", errText: "#C0362C",
+    barBg: "rgba(255,255,255,0.92)",
+  },
+  dark: {
+    bg: "#000000", card: "#1C1C1E", ink: "#F2F2F7", sub: "#98989F",
+    line: "#38383A", green: "#30D158", greenDark: "#30D158", blue: "#0A84FF",
+    fill: "#2C2C2E", red: "#FF453A",
+    tintBg: "#103420", errBg: "#331714", errBorder: "#66302A", errText: "#FF7A70",
+    barBg: "rgba(28,28,30,0.92)",
+  },
 };
+const prefersDark = () =>
+  typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+let C = PALETTES[prefersDark() ? "dark" : "light"];
 const font = {
   fontFamily:
     "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
@@ -439,6 +452,20 @@ export default function AdaptTrainer() {
   const [installHint, setInstallHint] = useState(false);
   const [shareMsg, setShareMsg] = useState("");
   const [restDone, setRestDone] = useState(false);
+  const [newBests, setNewBests] = useState([]);
+  const [backupNudge, setBackupNudge] = useState(false);
+
+  /* live dark-mode switching: C is module-level, so one reassignment plus a
+     re-render restyles everything — Ring and TrendChart included */
+  const [, setThemeTick] = useState(0);
+  useEffect(() => {
+    if (!window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => { C = PALETTES[mq.matches ? "dark" : "light"]; setThemeTick((t) => t + 1); };
+    if (mq.addEventListener) { mq.addEventListener("change", onChange); return () => mq.removeEventListener("change", onChange); }
+    mq.addListener(onChange);
+    return () => mq.removeListener(onChange);
+  }, []);
 
   /* rest timer */
   useEffect(() => {
@@ -460,9 +487,10 @@ export default function AdaptTrainer() {
   /* persistence */
   useEffect(() => {
     (async () => {
+      /* hoisted: the backup-nudge check below needs it after this try/catch */
+      let savedSessions = [];
       try {
         const r = await window.storage.get("adapt:v1");
-        let savedSessions = [];
         if (r && r.value) {
           const d = JSON.parse(r.value);
           savedSessions = d.sessions || [];
@@ -497,6 +525,17 @@ export default function AdaptTrainer() {
       } catch (e) {
         if (!isStandalone()) setInstallHint(true);
       }
+      /* backup nudge: the export is the only recovery path, so once there is
+         something to lose (8+ lifting sessions), remind until exported —
+         snoozed 14 days on dismiss, 21 days after an export */
+      try {
+        if (savedSessions.filter((s) => s.type !== "CARDIO").length >= 8) {
+          let meta = {};
+          try { const m = await window.storage.get("adapt:backupMeta"); meta = JSON.parse(m.value) || {}; } catch (e) { /* never exported */ }
+          const stale = (d, days) => !d || diffDays(d, todayStr()) > days;
+          if (stale(meta.exportedAt, 21) && stale(meta.dismissedAt, 14)) setBackupNudge(true);
+        }
+      } catch (e) { /* the nudge is best-effort */ }
       setLoaded(true);
     })();
   }, []);
@@ -617,9 +656,43 @@ export default function AdaptTrainer() {
     setTimeout(() => setCardioMsg(false), 2500);
   };
 
+  /* all-time top weight (and top reps) for an exercise across saved history */
+  const bestSoFar = (exId) => {
+    let w = 0, r = 0;
+    for (const s of sessions) {
+      if (s.type === "CARDIO") continue;
+      for (const e of s.entries || []) {
+        if (e.exId !== exId) continue;
+        for (const st of e.sets || []) {
+          if (!st.r) continue;
+          const sw = parseFloat(st.w) || 0, sr = parseInt(st.r, 10) || 0;
+          if (sw > w) w = sw;
+          if (sr > r) r = sr;
+        }
+      }
+    }
+    return { w, r };
+  };
+
   const finish = async () => {
     const clean = entries.map((e) => ({ slot: e.slot, exId: e.exId, name: e.name, sets: e.sets.filter((s) => s.r) })).filter((e) => e.sets.length);
     if (!clean.length) return;
+    /* New-best check against history BEFORE this session is appended. A first
+       log of an exercise is the baseline, never a PR; weight beats count only
+       against prior weighted work, rep bests only for bodyweight-only moves. */
+    const bests = [];
+    for (const e of clean) {
+      const prev = bestSoFar(e.exId);
+      let topW = 0, topR = 0;
+      for (const st of e.sets) {
+        const w = parseFloat(st.w) || 0, r = parseInt(st.r, 10) || 0;
+        if (w > topW) topW = w;
+        if (r > topR) topR = r;
+      }
+      if (prev.w > 0 && topW > prev.w) bests.push({ name: e.name, text: `${topW} ${units} — was ${prev.w}` });
+      else if (prev.w === 0 && topW === 0 && prev.r > 0 && topR > prev.r) bests.push({ name: e.name, text: `${topR} reps — was ${prev.r}` });
+    }
+    setNewBests(bests);
     const rec = { id: Date.now(), date: todayStr(), type: activeType, ...(light ? { light: true } : {}), entries: clean };
     const next = [...sessions, rec].sort((a, b) => a.date.localeCompare(b.date));
     setSessions(next);
@@ -737,6 +810,17 @@ export default function AdaptTrainer() {
   const eqSummary = [["barbell", "Barbell"], ["machines", "Machines"], ["cables", "Cables"], ["dumbbells", "DBs"], ["bench", "Bench"], ["dip", "Dips"], ["pullup", "Pull-up"]]
     .filter(([k]) => equipment[k]).map(([, l]) => l).join(" · ") || "Bodyweight only";
 
+  useEffect(() => { if (view !== "today") setNewBests([]); }, [view]);
+
+  /* backup bookkeeping — one optional key, readers tolerate its absence */
+  const saveBackupMeta = (patch) => {
+    (async () => {
+      let meta = {};
+      try { const m = await window.storage.get("adapt:backupMeta"); meta = JSON.parse(m.value) || {}; } catch (e) { /* none yet */ }
+      try { await window.storage.set("adapt:backupMeta", JSON.stringify({ ...meta, ...patch })); } catch (e) { /* best-effort */ }
+    })();
+  };
+
   const dismissInstallHint = () => {
     setInstallHint(false);
     window.storage.set("adapt:hideInstallHint", "1").catch(() => {});
@@ -761,8 +845,11 @@ export default function AdaptTrainer() {
     }
   };
 
-  const exportData = () =>
+  const exportData = () => {
     setBackupText(JSON.stringify({ sessions, equipment, units, bw }));
+    setBackupNudge(false);
+    saveBackupMeta({ exportedAt: todayStr() });
+  };
   const importData = async () => {
     try {
       const d = JSON.parse(importText);
@@ -780,11 +867,12 @@ export default function AdaptTrainer() {
   if (!loaded)
     return <div style={{ ...font, background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: C.sub }}>Loading…</div>;
 
-  const inputStyle = { padding: "9px 10px", borderRadius: 10, border: `1px solid ${C.line}`, fontSize: 16, background: C.fill, width: 76, textAlign: "center", ...font };
+  const inputStyle = { padding: "9px 10px", borderRadius: 10, border: `1px solid ${C.line}`, fontSize: 16, background: C.fill, color: C.ink, width: 76, textAlign: "center", ...font };
 
   return (
     <div style={{ ...font, background: C.bg, minHeight: "100vh", color: C.ink, WebkitFontSmoothing: "antialiased" }}>
       <style>{`
+        :root { color-scheme: light dark; }
         input:focus { outline: 2px solid ${C.green}; outline-offset: 1px; border-color: transparent; }
         button { cursor: pointer; font-family: inherit; }
         @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
@@ -814,7 +902,7 @@ export default function AdaptTrainer() {
         </div>
 
         {(storageOk === false || saveError) && (
-          <div style={{ background: "#FFF3F2", border: "1px solid #FFC7C2", color: "#C0362C", borderRadius: 12, padding: "10px 14px", fontSize: 13, lineHeight: 1.4, marginBottom: 14 }}>
+          <div style={{ background: C.errBg, border: `1px solid ${C.errBorder}`, color: C.errText, borderRadius: 12, padding: "10px 14px", fontSize: 13, lineHeight: 1.4, marginBottom: 14 }}>
             <strong>Saving isn't working in this view.</strong> Your log won't survive closing the app from here. Open Edit → Backup and copy your data out before leaving.
           </div>
         )}
@@ -854,6 +942,39 @@ export default function AdaptTrainer() {
               </section>
             )}
 
+            {/* post-finish celebration — ephemeral, clears on leaving Today */}
+            {newBests.length > 0 && (
+              <section style={{ background: C.tintBg, borderRadius: 16, boxShadow: shadow, padding: "12px 16px", marginBottom: 12 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: C.greenDark, marginBottom: 2 }}>
+                  New best{newBests.length === 1 ? "" : "s"} 🎉
+                </div>
+                {newBests.map((b) => (
+                  <div key={b.name} style={{ fontSize: 13, color: C.ink, lineHeight: 1.6 }}>
+                    <strong>{b.name}</strong> · {b.text}
+                  </div>
+                ))}
+              </section>
+            )}
+
+            {/* backup nudge — there is no server copy, the export is the backup */}
+            {backupNudge && (
+              <section style={{ background: C.card, borderRadius: 16, boxShadow: shadow, padding: "12px 14px 12px 18px", marginBottom: 12, display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>Back up your log</div>
+                  <p style={{ fontSize: 13, color: C.sub, lineHeight: 1.5, margin: "3px 0 8px" }}>
+                    Your {allStats.liftCount} sessions live only on this phone — there is no cloud copy.
+                    Copy the export somewhere safe (Notes, a message to yourself); it takes under a minute.
+                  </p>
+                  <button onClick={() => { setSetupOpen(true); exportData(); }}
+                    style={{ padding: "8px 14px", borderRadius: 10, border: "none", background: C.fill, color: C.blue, fontWeight: 600, fontSize: 14 }}>
+                    Export now
+                  </button>
+                </div>
+                <button onClick={() => { setBackupNudge(false); saveBackupMeta({ dismissedAt: todayStr() }); }} aria-label="dismiss backup reminder"
+                  style={{ background: "transparent", border: "none", color: C.sub, fontSize: 15, padding: "4px 6px", flexShrink: 0 }}>✕</button>
+              </section>
+            )}
+
             {/* session card */}
             <section style={{ background: C.card, borderRadius: 16, boxShadow: shadow, padding: "16px 18px", marginBottom: 12 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -872,7 +993,7 @@ export default function AdaptTrainer() {
                 <>
                   <select value={activeType}
                     onChange={(e) => { setOverrideType(e.target.value === plan.type ? null : e.target.value); setShowPicker(false); }}
-                    style={{ ...font, marginTop: 10, width: "100%", padding: "9px 10px", borderRadius: 10, border: `1px solid ${C.line}`, background: C.fill, fontSize: 15 }}>
+                    style={{ ...font, marginTop: 10, width: "100%", padding: "9px 10px", borderRadius: 10, border: `1px solid ${C.line}`, background: C.fill, color: C.ink, fontSize: 15 }}>
                     {Object.keys(TEMPLATES).map((k) => (
                       <option key={k} value={k}>{k === plan.type ? `${TEMPLATES[k].label} (recommended)` : TEMPLATES[k].label}</option>
                     ))}
@@ -935,19 +1056,19 @@ export default function AdaptTrainer() {
                   {backupText && (
                     <>
                       <textarea readOnly value={backupText} onFocus={(e) => e.target.select()}
-                        style={{ ...font, width: "100%", height: 72, marginTop: 8, fontSize: 11, borderRadius: 10, border: `1px solid ${C.line}`, background: C.fill, padding: 8, boxSizing: "border-box" }} />
+                        style={{ ...font, width: "100%", height: 72, marginTop: 8, fontSize: 11, borderRadius: 10, border: `1px solid ${C.line}`, background: C.fill, color: C.ink, padding: 8, boxSizing: "border-box" }} />
                       <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>Tap the box, copy all, paste somewhere safe (Notes, a message to yourself).</div>
                     </>
                   )}
                   <textarea placeholder="Paste exported data here to restore…" value={importText} onChange={(e) => setImportText(e.target.value)}
-                    style={{ ...font, width: "100%", height: 48, marginTop: 10, fontSize: 11, borderRadius: 10, border: `1px solid ${C.line}`, background: C.fill, padding: 8, boxSizing: "border-box" }} />
+                    style={{ ...font, width: "100%", height: 48, marginTop: 10, fontSize: 11, borderRadius: 10, border: `1px solid ${C.line}`, background: C.fill, color: C.ink, padding: 8, boxSizing: "border-box" }} />
                   {importText && (
                     <button onClick={importData}
                       style={{ marginTop: 6, width: "100%", padding: "9px 0", borderRadius: 10, border: "none", background: C.green, color: "#fff", fontWeight: 600, fontSize: 14 }}>
                       Restore from backup
                     </button>
                   )}
-                  {importMsg && <div style={{ fontSize: 12, color: importMsg.includes("✓") ? C.greenDark : "#C0362C", marginTop: 6 }}>{importMsg}</div>}
+                  {importMsg && <div style={{ fontSize: 12, color: importMsg.includes("✓") ? C.greenDark : C.errText, marginTop: 6 }}>{importMsg}</div>}
                   <div style={{ fontSize: 12, color: C.sub, fontWeight: 600, margin: "16px 0 8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Share</div>
                   <button onClick={shareApp}
                     style={{ width: "100%", padding: "9px 0", borderRadius: 10, border: "none", background: C.fill, color: C.blue, fontWeight: 600, fontSize: 14 }}>
@@ -977,7 +1098,7 @@ export default function AdaptTrainer() {
                   ))}
                   {activeType !== "CARDIO_DAY" && (
                     <>
-                      <p style={{ fontSize: 13, color: C.greenDark, background: "#E8F8EC", borderRadius: 8, padding: "8px 10px", margin: "10px 0 0", lineHeight: 1.45 }}>{RAMP_RULE}</p>
+                      <p style={{ fontSize: 13, color: C.greenDark, background: C.tintBg, borderRadius: 8, padding: "8px 10px", margin: "10px 0 0", lineHeight: 1.45 }}>{RAMP_RULE}</p>
                       <p style={{ fontSize: 12, color: C.sub, margin: "8px 0 0", lineHeight: 1.45 }}>{COOLDOWN}</p>
                     </>
                   )}
@@ -1024,7 +1145,7 @@ export default function AdaptTrainer() {
                         <div style={{ fontSize: 13, color: C.sub, marginBottom: 4 }}>No history — today sets the baseline.</div>
                       )}
                       {target && (
-                        <div style={{ display: "inline-block", background: "#E8F8EC", color: C.greenDark, fontSize: 13, fontWeight: 600, borderRadius: 8, padding: "4px 10px", marginBottom: 8 }}>
+                        <div style={{ display: "inline-block", background: C.tintBg, color: C.greenDark, fontSize: 13, fontWeight: 600, borderRadius: 8, padding: "4px 10px", marginBottom: 8 }}>
                           {target}
                         </div>
                       )}
@@ -1073,7 +1194,7 @@ export default function AdaptTrainer() {
                       {swapOpen === idx && (
                         <div style={{ marginTop: 10, background: C.fill, borderRadius: 12, overflow: "hidden" }}>
                           {e.sets.length > 0 && (
-                            <div style={{ fontSize: 12, color: "#C0362C", padding: "8px 12px 2px" }}>
+                            <div style={{ fontSize: 12, color: C.errText, padding: "8px 12px 2px" }}>
                               Switching clears the sets you've logged for this exercise today.
                             </div>
                           )}
@@ -1137,7 +1258,7 @@ export default function AdaptTrainer() {
 
             {/* bottom bar */}
             {/* safe-area padding keeps Finish clear of the iPhone home indicator */}
-            <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: "rgba(255,255,255,0.92)", backdropFilter: "blur(12px)", borderTop: `1px solid ${C.line}`, padding: "12px 16px calc(12px + env(safe-area-inset-bottom))", display: "flex", justifyContent: "center", zIndex: 30 }}>
+            <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, background: C.barBg, backdropFilter: "blur(12px)", borderTop: `1px solid ${C.line}`, padding: "12px 16px calc(12px + env(safe-area-inset-bottom))", display: "flex", justifyContent: "center", zIndex: 30 }}>
               <div style={{ display: "flex", gap: 10, width: "100%", maxWidth: 528 }}>
                 <button onClick={() => {
                   /* Stamp `now` from the same instant: it only ticks while a timer
@@ -1147,7 +1268,7 @@ export default function AdaptTrainer() {
                   setRestDone(false);
                   setRestEnd(restLeft > 0 ? null : t + 120000);
                 }}
-                  style={{ fontWeight: 600, fontSize: 15, padding: "13px 16px", borderRadius: 14, border: "none", background: restLeft > 0 ? "#E8F8EC" : restDone ? C.green : C.fill, color: restLeft > 0 ? C.greenDark : restDone ? "#fff" : C.sub, minWidth: 100, transition: "background .15s" }}>
+                  style={{ fontWeight: 600, fontSize: 15, padding: "13px 16px", borderRadius: 14, border: "none", background: restLeft > 0 ? C.tintBg : restDone ? C.green : C.fill, color: restLeft > 0 ? C.greenDark : restDone ? "#fff" : C.sub, minWidth: 100, transition: "background .15s" }}>
                   {restLeft > 0 ? `${fmtRest(restLeft)} ✕` : restDone ? "Go ✓" : "Rest 2:00"}
                 </button>
                 <button disabled={!loggedSets}
@@ -1226,6 +1347,10 @@ export default function AdaptTrainer() {
                   const pts = sel.points.slice(-12).map((p) => ({ ...p, v: weightBased ? p.topW : p.topR }));
                   const selIdx = chartPt !== null && chartPt < pts.length ? chartPt : pts.length - 1;
                   const p = pts[selIdx];
+                  /* the all-time best can predate the 12-session window */
+                  const bestPt = sel.points.reduce((a, b) => ((weightBased ? b.topW : b.topR) > (weightBased ? a.topW : a.topR) ? b : a));
+                  const bestV = weightBased ? bestPt.topW : bestPt.topR;
+                  const winMax = Math.max(...pts.map((pt) => pt.v));
                   return (
                     <section style={{ background: C.card, borderRadius: 16, boxShadow: shadow, padding: "14px 16px", marginBottom: 10 }}>
                       <div style={{ fontSize: 12, color: C.sub, fontWeight: 600, marginBottom: 8 }}>
@@ -1247,6 +1372,11 @@ export default function AdaptTrainer() {
                         {p.ef ? ` · felt ${EFFORT_WORD[p.ef]}` : ""}{p.light ? " · light day" : ""}
                         {sel.points.length > pts.length ? ` · last ${pts.length} of ${sel.points.length} sessions` : ""}
                       </div>
+                      {bestV > winMax && (
+                        <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>
+                          All-time best: {bestV} {weightBased ? units : "reps"} · {bestPt.date}
+                        </div>
+                      )}
                       {pts.length === 1 && (
                         <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>One session so far — the line appears at two.</div>
                       )}
