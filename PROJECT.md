@@ -12,6 +12,45 @@ Hosted on GitHub Pages so it can be installed to the iPhone Home Screen.
 Not to be confused with **REPS** (`repos/reps`), the other fitness PWA in this
 workspace. Separate app, separate repo. Nothing was touched there.
 
+## Status — 2026-10-24
+
+**Two-months-in quality pass** (owner asked "any improvements?"; ~8 weeks of
+real use since the last session). Three things shipped, all verified:
+
+- **Automatic dark mode.** The August blocker dissolved: iOS 15+ standalone
+  reads the matching media-queried `theme-color` meta for the status bar, so
+  index.html now carries a light/dark pair (plus `color-scheme` and a dark
+  body background) and the app never touches `status-bar-style`. In source,
+  `C` became a module-level `let` resolved from `PALETTES.light/dark`
+  (iOS dark system colors) at load and on `prefers-color-scheme` change —
+  every existing `C.*` reference worked unchanged; the previously hardcoded
+  tint/error/bar colors became tokens (`tintBg`, `errBg/Border/Text`,
+  `barBg`), and inputs/select/textareas got explicit `color: C.ink`. Chart
+  hue per mode: light keeps #248A3D on white, dark uses #30D158 on #1C1C1E —
+  both re-validated (lightness band, chroma, contrast ≥3:1; 8.42:1 dark).
+  Live switch verified without reload.
+  TRAP for future work: never hardcode a hex in a style again — tokens only
+  (rule added to AGENTS.md deploy traps). One self-inflicted bug caught in
+  test: a replace-all turned the light palette's own `tintBg` literal into a
+  self-reference, which white-screened the app — the Playwright suite caught
+  it before anything shipped.
+- **New-best recognition.** `finish` compares each exercise's top set
+  against its all-time best BEFORE the session is appended; beats surface in
+  a green "New best 🎉" card (first-ever logs are baselines, never PRs; rep
+  bests only for bodyweight-only moves). Ephemeral state, nothing persisted.
+  Progress adds an "All-time best" line when the best predates the
+  12-session chart window.
+- **Backup nudge.** Once 8+ lifting sessions exist, a dismissible card
+  reminds that the export is the only backup — snoozed 14 days on dismiss,
+  21 after an export. "Export now" opens the Edit panel with the export
+  ready. New optional key `adapt:backupMeta` ({exportedAt, dismissedAt});
+  bug found in test: the check initially read `savedSessions` out of scope
+  and its own best-effort catch swallowed the error — hoisted the
+  declaration.
+- `sw.js` VERSION v5 → v6. Toolchain re-verified byte-identical before
+  editing (fresh container). 51 Playwright checks across 6 scenarios, zero
+  console errors, dark screenshots eyeballed. Merged to `main` — deployed.
+
 ## Status — 2026-08-30
 
 **Friend-app idea harvest.** The owner shared a friend's tracker (a dark-mode

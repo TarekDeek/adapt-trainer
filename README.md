@@ -29,10 +29,13 @@ mode.
   telling you exactly why ("9 of your last 12 logged sets felt Hard or Max…").
   At most one automatic light day per rolling week; a manual override always
   wins; with no effort logged the feature is silent.
+- **Dark mode** — follows the phone's appearance setting automatically,
+  status bar included. Nothing to configure.
 - **Progress** — all-time totals (sessions, sets, volume, cardio minutes),
   the mix of how your rated sets felt, and a per-exercise trend of top set
   weight (best reps for bodyweight moves). Tap a dot for that session's
-  details.
+  details. Finishing a session that beats an all-time top weight gets a
+  "New best" callout.
 - **History** — past sessions; the first one you log becomes the baseline
   everything else adapts around.
 - **Backup / restore** — export your data as text you paste somewhere safe, and
@@ -48,9 +51,12 @@ Everything lives in `localStorage` on the device, under these keys:
 | `adapt:draft` | in-progress session, so a reload mid-workout doesn't lose it |
 | `adapt:ping` | storage-availability probe |
 | `adapt:hideInstallHint` | set once the "Add to Home Screen" banner is dismissed |
+| `adapt:backupMeta` | when you last exported / dismissed the backup reminder |
 
 The bundle contains **zero `fetch` calls**. Nothing leaves the phone, which also
 means there is no server-side copy — **the Backup export is your only backup.**
+Once you have 8+ sessions logged, the app reminds you to export every few
+weeks until you do.
 Deleting the PWA from the Home Screen can clear its storage with it.
 (The Edit → Share button opens the phone's share sheet with the app's URL —
 an OS affordance, not a network call; the zero-fetch guarantee stands.)

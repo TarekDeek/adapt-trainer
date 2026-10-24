@@ -39,7 +39,8 @@ committed rather than gitignored.
 - **Never change a storage key or set/session shape without a migration.**
   State is `localStorage`-only (`adapt:v1` sessions+settings, `adapt:draft`
   mid-workout autosave, `adapt:ping` probe, `adapt:hideInstallHint`
-  install-banner dismissal). There is no server copy: a rename
+  install-banner dismissal, `adapt:backupMeta` export/dismiss dates for the
+  backup reminder). There is no server copy: a rename
   orphans the user's entire training history with no way back. New fields must
   be *optional* and every reader must handle their absence — this is how `e`
   (effort) was added without touching existing data.
@@ -106,6 +107,15 @@ Added since:
 
 - **iOS PWA install is Safari-only.** Chrome/Firefox on iOS cannot Add to Home
   Screen. Test in Safari or the result is meaningless.
+
+- **Dark mode hinges on the paired `theme-color` metas** in `index.html` —
+  iOS 15+ standalone uses the matching one for the status bar, which is the
+  only way a PWA gets a correct bar in both appearances. Don't collapse them
+  back to a single meta, and don't set `apple-mobile-web-app-status-bar-style`
+  to anything but `default`. In `src/`, every color is a `C.*` token resolved
+  from `PALETTES` at render time (`C` is a module-level `let`, swapped on
+  scheme change); never hardcode a hex in a style — it will be wrong in one
+  of the two modes.
 
 ## Documented deviations from CONVENTIONS.md
 
