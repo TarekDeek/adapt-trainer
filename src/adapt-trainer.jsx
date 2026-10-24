@@ -425,6 +425,15 @@ function TrendChart({ pts, fmt, selected, onSelect }) {
   );
 }
 
+function GearIcon({ color }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1" />
+    </svg>
+  );
+}
+
 /* ============ COMPONENT ============ */
 export default function AdaptTrainer() {
   const [loaded, setLoaded] = useState(false);
@@ -438,7 +447,6 @@ export default function AdaptTrainer() {
   const [entries, setEntries] = useState(null);
   const [overrideType, setOverrideType] = useState(null);
   const [showPicker, setShowPicker] = useState(false);
-  const [setupOpen, setSetupOpen] = useState(false);
   const [expanded, setExpanded] = useState(0);
   const [savedFlash, setSavedFlash] = useState(false);
   const [restEnd, setRestEnd] = useState(null);
@@ -454,6 +462,7 @@ export default function AdaptTrainer() {
   const [restDone, setRestDone] = useState(false);
   const [newBests, setNewBests] = useState([]);
   const [backupNudge, setBackupNudge] = useState(false);
+  const [welcomeDismissed, setWelcomeDismissed] = useState(false);
 
   /* live dark-mode switching: C is module-level, so one reassignment plus a
      re-render restyles everything — Ring and TrendChart included */
@@ -525,6 +534,12 @@ export default function AdaptTrainer() {
       } catch (e) {
         if (!isStandalone()) setInstallHint(true);
       }
+      /* welcome card: auto-retires at the first session, but it can also be
+         dismissed by hand — the same text lives in Settings permanently */
+      try {
+        await window.storage.get("adapt:hideWelcome");
+        setWelcomeDismissed(true);
+      } catch (e) { /* not dismissed */ }
       /* backup nudge: the export is the only recovery path, so once there is
          something to lose (8+ lifting sessions), remind until exported —
          snoozed 14 days on dismiss, 21 days after an export */
@@ -807,9 +822,6 @@ export default function AdaptTrainer() {
     if (loaded && activeType === "CARDIO_DAY") setCardioOpen(true);
   }, [activeType, loaded]);
 
-  const eqSummary = [["barbell", "Barbell"], ["machines", "Machines"], ["cables", "Cables"], ["dumbbells", "DBs"], ["bench", "Bench"], ["dip", "Dips"], ["pullup", "Pull-up"]]
-    .filter(([k]) => equipment[k]).map(([, l]) => l).join(" · ") || "Bodyweight only";
-
   useEffect(() => { if (view !== "today") setNewBests([]); }, [view]);
 
   /* backup bookkeeping — one optional key, readers tolerate its absence */
@@ -824,6 +836,10 @@ export default function AdaptTrainer() {
   const dismissInstallHint = () => {
     setInstallHint(false);
     window.storage.set("adapt:hideInstallHint", "1").catch(() => {});
+  };
+  const dismissWelcome = () => {
+    setWelcomeDismissed(true);
+    window.storage.set("adapt:hideWelcome", "1").catch(() => {});
   };
   const shareApp = async () => {
     const url = appUrl();
@@ -885,10 +901,16 @@ export default function AdaptTrainer() {
           <div>
             <div style={{ fontSize: 13, color: C.sub, fontWeight: 500 }}>{prettyDate()}</div>
             <h1 style={{ fontSize: 30, fontWeight: 700, margin: "2px 0 0", letterSpacing: "-0.02em" }}>
-              {view === "today" ? "Today" : view === "progress" ? "Progress" : "History"}
+              {view === "today" ? "Today" : view === "progress" ? "Progress" : view === "settings" ? "Settings" : "History"}
             </h1>
           </div>
-          {view === "today" && <Ring done={loggedSets} total={totalPlanned} />}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <button onClick={() => setView(view === "settings" ? "today" : "settings")} aria-label="Settings"
+              style={{ width: 40, height: 40, borderRadius: 999, border: "none", background: view === "settings" ? C.fill : "transparent", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>
+              <GearIcon color={view === "settings" ? C.blue : C.sub} />
+            </button>
+            {view === "today" && <Ring done={loggedSets} total={totalPlanned} />}
+          </div>
         </header>
 
         {/* tabs */}
@@ -929,16 +951,21 @@ export default function AdaptTrainer() {
               </section>
             )}
 
-            {/* first-run welcome — disappears once the first session is saved */}
-            {!sessions.length && (
-              <section style={{ background: C.card, borderRadius: 16, boxShadow: shadow, padding: "14px 18px", marginBottom: 12 }}>
-                <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Welcome 👋</div>
-                <p style={{ fontSize: 13.5, color: C.sub, lineHeight: 1.55, margin: 0 }}>
-                  Adapt Trainer plans each workout from what you actually did over the last 7 days — no program to pick.
-                  Tap <strong style={{ color: C.ink }}>Edit</strong> below to set what equipment you have, log your sets,
-                  and after each set tap the <strong style={{ color: C.ink }}>effort</strong> chip (Easy → Max) so the
-                  weights adjust themselves. Everything stays on this device — nothing is uploaded, ever.
-                </p>
+            {/* first-run welcome — auto-retires at the first saved session,
+                dismissible by hand, and recessed permanently in Settings */}
+            {!sessions.length && !welcomeDismissed && (
+              <section style={{ background: C.card, borderRadius: 16, boxShadow: shadow, padding: "14px 14px 14px 18px", marginBottom: 12, display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Welcome 👋</div>
+                  <p style={{ fontSize: 13.5, color: C.sub, lineHeight: 1.55, margin: 0 }}>
+                    Adapt Trainer plans each workout from what you actually did over the last 7 days — no program to pick.
+                    Tap the <strong style={{ color: C.ink }}>gear</strong> up top to set what equipment you have, log your
+                    sets, and after each set tap the <strong style={{ color: C.ink }}>effort</strong> chip (Easy → Max) so
+                    the weights adjust themselves. Everything stays on this device — nothing is uploaded, ever.
+                  </p>
+                </div>
+                <button onClick={dismissWelcome} aria-label="dismiss welcome"
+                  style={{ background: "transparent", border: "none", color: C.sub, fontSize: 15, padding: "4px 6px", flexShrink: 0 }}>✕</button>
               </section>
             )}
 
@@ -965,7 +992,7 @@ export default function AdaptTrainer() {
                     Your {allStats.liftCount} sessions live only on this phone — there is no cloud copy.
                     Copy the export somewhere safe (Notes, a message to yourself); it takes under a minute.
                   </p>
-                  <button onClick={() => { setSetupOpen(true); exportData(); }}
+                  <button onClick={() => { setView("settings"); exportData(); }}
                     style={{ padding: "8px 14px", borderRadius: 10, border: "none", background: C.fill, color: C.blue, fontWeight: 600, fontSize: 14 }}>
                     Export now
                   </button>
@@ -1011,71 +1038,6 @@ export default function AdaptTrainer() {
                 <p style={{ fontSize: 13, color: C.greenDark, margin: "8px 0 0" }}>
                   ✓ Already logged today — anything below counts as a second session.
                 </p>
-              )}
-            </section>
-
-            {/* setup: gym + body, collapsed by default */}
-            <section style={{ background: C.card, borderRadius: 16, boxShadow: shadow, marginBottom: 16, overflow: "hidden" }}>
-              <button onClick={() => setSetupOpen(!setupOpen)}
-                style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 18px", background: "transparent", border: "none", fontSize: 14 }}>
-                <span style={{ color: C.sub }}>
-                  {eqSummary}{proteinG ? ` · ${proteinG}g protein` : ""}
-                </span>
-                <span style={{ color: C.blue, fontWeight: 500 }}>{setupOpen ? "Done" : "Edit"}</span>
-              </button>
-              {setupOpen && (
-                <div style={{ padding: "0 18px 16px", borderTop: `1px solid ${C.line}` }}>
-                  <div style={{ fontSize: 12, color: C.sub, fontWeight: 600, margin: "12px 0 8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>This gym has</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {[["barbell", "Barbell"], ["machines", "Machines"], ["cables", "Cables"], ["dumbbells", "Dumbbells"], ["bench", "Bench"], ["dip", "Dip station"], ["pullup", "Pull-up bar"]].map(([k, label]) => (
-                      <button key={k} onClick={() => toggleEq(k)}
-                        style={{ padding: "7px 14px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: "none", background: equipment[k] ? C.green : C.fill, color: equipment[k] ? "#fff" : C.sub, transition: "all .15s" }}>
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  <div style={{ fontSize: 12, color: C.sub, fontWeight: 600, margin: "16px 0 8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Body & fuel</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                    <input inputMode="decimal" placeholder="weight" value={bw} onChange={(e) => changeBw(e.target.value)} style={inputStyle} />
-                    <button onClick={toggleUnits} style={{ padding: "8px 14px", borderRadius: 10, border: `1px solid ${C.line}`, background: C.fill, fontSize: 14, fontWeight: 600 }}>
-                      {units}
-                    </button>
-                    {proteinG && (
-                      <span style={{ fontSize: 13, color: C.sub }}>
-                        ≥ <strong style={{ color: C.ink }}>{proteinG}g</strong> protein · ~{calsMaint} kcal (+200 to build)
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: 12, color: C.sub, fontWeight: 600, margin: "16px 0 8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Backup</div>
-                  <div style={{ display: "flex", gap: 10 }}>
-                    <button onClick={exportData}
-                      style={{ flex: 1, padding: "9px 0", borderRadius: 10, border: "none", background: C.fill, color: C.blue, fontWeight: 600, fontSize: 14 }}>
-                      Export data
-                    </button>
-                  </div>
-                  {backupText && (
-                    <>
-                      <textarea readOnly value={backupText} onFocus={(e) => e.target.select()}
-                        style={{ ...font, width: "100%", height: 72, marginTop: 8, fontSize: 11, borderRadius: 10, border: `1px solid ${C.line}`, background: C.fill, color: C.ink, padding: 8, boxSizing: "border-box" }} />
-                      <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>Tap the box, copy all, paste somewhere safe (Notes, a message to yourself).</div>
-                    </>
-                  )}
-                  <textarea placeholder="Paste exported data here to restore…" value={importText} onChange={(e) => setImportText(e.target.value)}
-                    style={{ ...font, width: "100%", height: 48, marginTop: 10, fontSize: 11, borderRadius: 10, border: `1px solid ${C.line}`, background: C.fill, color: C.ink, padding: 8, boxSizing: "border-box" }} />
-                  {importText && (
-                    <button onClick={importData}
-                      style={{ marginTop: 6, width: "100%", padding: "9px 0", borderRadius: 10, border: "none", background: C.green, color: "#fff", fontWeight: 600, fontSize: 14 }}>
-                      Restore from backup
-                    </button>
-                  )}
-                  {importMsg && <div style={{ fontSize: 12, color: importMsg.includes("✓") ? C.greenDark : C.errText, marginTop: 6 }}>{importMsg}</div>}
-                  <div style={{ fontSize: 12, color: C.sub, fontWeight: 600, margin: "16px 0 8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Share</div>
-                  <button onClick={shareApp}
-                    style={{ width: "100%", padding: "9px 0", borderRadius: 10, border: "none", background: C.fill, color: C.blue, fontWeight: 600, fontSize: 14 }}>
-                    {shareMsg || "Share this app with a friend"}
-                  </button>
-                  <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>Sends them the link. They get their own copy — your log stays on your phone.</div>
-                </div>
               )}
             </section>
 
@@ -1385,6 +1347,92 @@ export default function AdaptTrainer() {
                 })()}
               </>
             )}
+          </>
+        )}
+
+        {view === "settings" && (
+          <>
+            {/* gym scoping */}
+            <section style={{ background: C.card, borderRadius: 16, boxShadow: shadow, padding: "14px 18px 16px", marginBottom: 10 }}>
+              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>This gym has</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {[["barbell", "Barbell"], ["machines", "Machines"], ["cables", "Cables"], ["dumbbells", "Dumbbells"], ["bench", "Bench"], ["dip", "Dip station"], ["pullup", "Pull-up bar"]].map(([k, label]) => (
+                  <button key={k} onClick={() => toggleEq(k)}
+                    style={{ padding: "7px 14px", borderRadius: 999, fontSize: 14, fontWeight: 500, border: "none", background: equipment[k] ? C.green : C.fill, color: equipment[k] ? "#fff" : C.sub, transition: "all .15s" }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div style={{ fontSize: 12, color: C.sub, marginTop: 8, lineHeight: 1.4 }}>
+                Today's exercises come only from what's on. Changing this mid-workout rebuilds the session.
+              </div>
+            </section>
+
+            {/* body & fuel */}
+            <section style={{ background: C.card, borderRadius: 16, boxShadow: shadow, padding: "14px 18px 16px", marginBottom: 10 }}>
+              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Body & fuel</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <input inputMode="decimal" placeholder="weight" value={bw} onChange={(e) => changeBw(e.target.value)} style={inputStyle} />
+                <button onClick={toggleUnits} style={{ padding: "8px 14px", borderRadius: 10, border: `1px solid ${C.line}`, background: C.fill, color: C.ink, fontSize: 14, fontWeight: 600 }}>
+                  {units}
+                </button>
+                {proteinG && (
+                  <span style={{ fontSize: 13, color: C.sub }}>
+                    ≥ <strong style={{ color: C.ink }}>{proteinG}g</strong> protein · ~{calsMaint} kcal (+200 to build)
+                  </span>
+                )}
+              </div>
+            </section>
+
+            {/* backup */}
+            <section style={{ background: C.card, borderRadius: 16, boxShadow: shadow, padding: "14px 18px 16px", marginBottom: 10 }}>
+              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Backup</div>
+              <button onClick={exportData}
+                style={{ width: "100%", padding: "9px 0", borderRadius: 10, border: "none", background: C.fill, color: C.blue, fontWeight: 600, fontSize: 14 }}>
+                Export data
+              </button>
+              {backupText && (
+                <>
+                  <textarea readOnly value={backupText} onFocus={(e) => e.target.select()}
+                    style={{ ...font, width: "100%", height: 72, marginTop: 8, fontSize: 11, borderRadius: 10, border: `1px solid ${C.line}`, background: C.fill, color: C.ink, padding: 8, boxSizing: "border-box" }} />
+                  <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>Tap the box, copy all, paste somewhere safe (Notes, a message to yourself).</div>
+                </>
+              )}
+              <textarea placeholder="Paste exported data here to restore…" value={importText} onChange={(e) => setImportText(e.target.value)}
+                style={{ ...font, width: "100%", height: 48, marginTop: 10, fontSize: 11, borderRadius: 10, border: `1px solid ${C.line}`, background: C.fill, color: C.ink, padding: 8, boxSizing: "border-box" }} />
+              {importText && (
+                <button onClick={importData}
+                  style={{ marginTop: 6, width: "100%", padding: "9px 0", borderRadius: 10, border: "none", background: C.green, color: "#fff", fontWeight: 600, fontSize: 14 }}>
+                  Restore from backup
+                </button>
+              )}
+              {importMsg && <div style={{ fontSize: 12, color: importMsg.includes("✓") ? C.greenDark : C.errText, marginTop: 6 }}>{importMsg}</div>}
+              <div style={{ fontSize: 12, color: C.sub, marginTop: 8, lineHeight: 1.4 }}>
+                Everything lives on this phone — the export is your only backup.
+              </div>
+            </section>
+
+            {/* share */}
+            <section style={{ background: C.card, borderRadius: 16, boxShadow: shadow, padding: "14px 18px 16px", marginBottom: 10 }}>
+              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Share</div>
+              <button onClick={shareApp}
+                style={{ width: "100%", padding: "9px 0", borderRadius: 10, border: "none", background: C.fill, color: C.blue, fontWeight: 600, fontSize: 14 }}>
+                {shareMsg || "Share this app with a friend"}
+              </button>
+              <div style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>Sends them the link. They get their own copy — your log stays on your phone.</div>
+            </section>
+
+            {/* the welcome text, recessed here permanently */}
+            <section style={{ background: C.card, borderRadius: 16, boxShadow: shadow, padding: "14px 18px 16px", marginBottom: 10 }}>
+              <div style={{ fontSize: 12, color: C.sub, fontWeight: 600, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>How it works</div>
+              <p style={{ fontSize: 13.5, color: C.sub, lineHeight: 1.55, margin: 0 }}>
+                Adapt Trainer plans each workout from what you actually did over the last 7 days — no program to pick.
+                Log your sets, and tap the <strong style={{ color: C.ink }}>effort</strong> chip (Easy → Max) after a set
+                so the weights adjust themselves; when most of a week's sets felt Hard or Max it schedules a deliberately
+                lighter day. Cardio is tracked but never changes your lifting plan. Everything stays on this device —
+                nothing is uploaded, ever.
+              </p>
+            </section>
           </>
         )}
 
